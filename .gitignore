@@ -45,3 +45,4 @@ android/app/build/
 .DS_Store
 .idea/
 .vscode/
+.env

@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
         width: "100%", 
         height: 160, 
         marginTop: 0, 
-        marginBottom: 70 
+        marginBottom:  70
     },
   
     title: { 
