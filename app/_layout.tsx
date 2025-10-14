@@ -1,6 +1,8 @@
 // app/_layout.tsx
+import React from "react";
 import { Stack } from "expo-router";
-import { AuthProvider } from "../src/store/auth"; // <- ชี้มาที่ไฟล์ที่ export AuthProvider
+// เลือกแบบใดแบบหนึ่งให้ตรงกับไฟล์ด้านบน (แนะนำ default)
+import AuthProvider from "../src/store/authStore"; // ✅ default import ที่ตรงกับ default export
 
 export default function RootLayout() {
   return (

@@ -28,44 +28,45 @@ export default function SignUpScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const onSubmit = async () => {
-  if (!name || !email || !password || !confirm) {
-    Alert.alert("Oops", "Please fill in all fields.");
-    return;
-  }
-  if (password.length < 6) {
-    Alert.alert("Password too short", "At least 6 characters.");
-    return;
-  }
-  if (password !== confirm) {
-    Alert.alert("Mismatch", "Passwords do not match.");
-    return;
-  }
-  try {
-    setSubmitting(true);
-    await signUpWithEmail({
-      username: name,       // ← SPEC ต้องการ username (required)
-      email,
-      password,
-      display_name: name,   // (optional) เก็บชื่อโชว์
-    });
-    router.replace("/(tabs)");
-  } catch (e: any) {
-    Alert.alert("Sign up failed", e?.response?.data?.message || "Please try again.");
-  } finally {
-    setSubmitting(false);
-  }
-};
+    if (!name || !email || !password || !confirm) {
+      Alert.alert("Oops", "Please fill in all fields.");
+      return;
+    }
+    if (password.length < 6) {
+      Alert.alert("Password too short", "At least 6 characters.");
+      return;
+    }
+    if (password !== confirm) {
+      Alert.alert("Mismatch", "Passwords do not match.");
+      return;
+    }
+    try {
+      setSubmitting(true);
+      await signUpWithEmail({
+        email,
+        password,
+        username: name,
+        display_name: name,
+        name,
+      });
+      router.replace("/(tabs)");
+    } catch (e: any) {
+      Alert.alert("Sign up failed", e?.response?.data?.message || "Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.select({ ios: "padding" })}
+      pointerEvents="box-none" // ✅ อย่าขวางทัช
     >
-      <View style={styles.screen}>
+      <View style={[styles.screen]} pointerEvents="box-none">
         {/* ส่วนบน (โลโก้ + ข้อความต้อนรับ) */}
-        <View style={styles.topSection}>
+        <View style={styles.topSection} pointerEvents="box-none">
           <Image
-            // ปรับ path ให้ตรงกับโครงของคุณ: asset/images/*
             source={require("../../assets/images/logo.png")}
             style={styles.logo}
             contentFit="contain"
@@ -76,8 +77,12 @@ export default function SignUpScreen() {
           </Text>
         </View>
 
-        {/* ✅ แท็บอยู่นอกกรอบสีฟ้า */}
-        <View style={styles.tabsOuterRow}>
+        {/* แท็บอยู่นอกกรอบสีฟ้า */}
+        <View
+          style={[styles.tabsOuterRow, { zIndex: 1 }]} // ✅ วางบนสุดเฉพาะแถบนี้
+          // ถ้าเป็น overlay ยาวผิดปกติ ให้ตัดทัชออกไปเลย:
+          pointerEvents="auto"
+        >
           <Pressable onPress={() => router.replace("/Auth/signin")} style={styles.tabBtn}>
             <Text style={styles.tabText}>Login</Text>
           </Pressable>
@@ -87,11 +92,17 @@ export default function SignUpScreen() {
         </View>
 
         {/* กรอบสีฟ้าด้านล่าง */}
-        <View style={styles.bottomSheet}>
+        <View
+          style={[
+            styles.bottomSheet,
+            { position: "relative", zIndex: 0, overflow: "visible" }, // ✅ กัน overlay ทับปุ่ม
+          ]}
+          pointerEvents="box-none"
+        >
           <ScrollView
-            contentContainerStyle={styles.sheetContent}
+            contentContainerStyle={[styles.sheetContent, { paddingBottom: 32 }]}
             showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always" // ✅ ให้ทัชวิ่งลงมาถึงปุ่ม
           >
             {/* Name */}
             <View style={styles.inputWrap}>
@@ -128,11 +139,7 @@ export default function SignUpScreen() {
                 secureTextEntry={!showPw}
               />
               <Pressable onPress={() => setShowPw((v) => !v)} style={styles.smallRow}>
-                <Ionicons
-                  name={showPw ? "eye-off-outline" : "eye-outline"}
-                  size={18}
-                  color="#6B6B6B"
-                />
+                <Ionicons name={showPw ? "eye-off-outline" : "eye-outline"} size={18} color="#6B6B6B" />
               </Pressable>
             </View>
 
@@ -147,18 +154,23 @@ export default function SignUpScreen() {
                 secureTextEntry={!showPw2}
               />
               <Pressable onPress={() => setShowPw2((v) => !v)} style={styles.smallRow}>
-                <Ionicons
-                  name={showPw2 ? "eye-off-outline" : "eye-outline"}
-                  size={18}
-                  color="#6B6B6B"
-                />
+                <Ionicons name={showPw2 ? "eye-off-outline" : "eye-outline"} size={18} color="#6B6B6B" />
               </Pressable>
             </View>
 
             {/* ปุ่มสมัคร */}
-            <Pressable style={[styles.btn, styles.btnPrimary]} onPress={onSubmit}>
-              <Text style={[styles.btnText, styles.btnPrimaryText]}>Create account</Text>
-            </Pressable>
+            <View style={{ position: "relative", zIndex: 2 }}>
+              <Pressable
+                style={[styles.btn, styles.btnPrimary]}
+                onPress={onSubmit}
+                disabled={submitting}
+                onPressIn={() => console.log("Create account pressed in")} // debug ชั่วคราว
+              >
+                <Text style={[styles.btnText, styles.btnPrimaryText]}>
+                  {submitting ? "Creating..." : "Create account"}
+                </Text>
+              </Pressable>
+            </View>
 
             {/* Terms */}
             <Text style={styles.terms}>
@@ -172,5 +184,6 @@ export default function SignUpScreen() {
     </KeyboardAvoidingView>
   );
 }
+
 
 
