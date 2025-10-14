@@ -1,5 +1,5 @@
 // src/utils/logger.ts
-import { ENV } from '@/config/env.config';
+import { ENV } from '../config/env.config';
 
 export enum LogLevel {
   DEBUG = 0,
