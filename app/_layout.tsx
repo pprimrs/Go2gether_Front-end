@@ -1,13 +1,14 @@
+// app/_layout.tsx
 import { Stack } from "expo-router";
+import { AuthProvider } from "../src/store/auth"; // <- ชี้มาที่ไฟล์ที่ export AuthProvider
 
 export default function RootLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />     {/* Landing */}
-      <Stack.Screen name="Auth" />      {/* กลุ่ม Auth */}
-      <Stack.Screen name="(tabs)" />    {/* กลุ่ม Tabs */}
-    </Stack>
+    <AuthProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </AuthProvider>
   );
 }
+
 
 
