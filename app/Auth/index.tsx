@@ -9,7 +9,7 @@ export default function HomeScreen() {
       {/* โลโก้ + ชื่อแอป */}
       <View style={styles.header}>
         <Image
-          source={require("../../assets/images/logo.png")}      // <-- จาก Auth ใช้ ../../
+          source={require("../../../assets/images/logo.png")}      // <-- จาก Auth ใช้ ../../
           style={styles.logo}
           contentFit="contain"
         />
@@ -17,7 +17,7 @@ export default function HomeScreen() {
 
       {/* ภาพคนกลุ่ม */}
       <Image
-        source={require("../../assets/images/home-page.png")}   // <-- จาก Auth ใช้ ../../
+        source={require("../../../assets/images/home-page.png")}   // <-- จาก Auth ใช้ ../../
         style={styles.home}
         contentFit="contain"
       />
