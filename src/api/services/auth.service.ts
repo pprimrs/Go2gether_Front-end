@@ -1,33 +1,24 @@
 // src/api/services/auth.service.ts
-import { apiClient } from '@/api/client';
-import { TokenStorage } from '@/utils/storage';
-import { logger } from '@/utils/logger';
 import {
-  LoginRequest,
-  RegisterRequest,
   AuthResponse,
-  UserResponse,
   ForgotPasswordRequest,
   ForgotPasswordResponse,
-  VerifyOTPRequest,
-  VerifyOTPResponse,
+  LoginRequest,
+  RegisterRequest,
   ResetPasswordRequest,
   ResetPasswordResponse,
-} from '@/types/auth.types';
+  UserResponse,
+  VerifyOTPRequest,
+  VerifyOTPResponse,
+} from '../../types/auth.types';
+import { logger } from '../../utils/logger';
+import { TokenStorage } from '../../utils/storage';
+import { client } from '../client';
+import { API_ENDPOINTS } from '../endpoints';
 
 class AuthService {
-  private readonly endpoints = {
-    register: '/api/auth/register',
-    login: '/api/auth/login',
-    logout: '/api/auth/logout',
-    profile: '/api/auth/profile',
-    forgotPassword: '/api/auth/forgot-password',
-    verifyOTP: '/api/auth/verify-otp',
-    resetPassword: '/api/auth/reset-password',
-    googleLogin: '/api/auth/google/login',
-    googleCallback: '/api/auth/google/callback',
-    refresh: '/api/auth/refresh',
-  };
+  // Use the centralized endpoints
+  private readonly endpoints = API_ENDPOINTS.AUTH;
 
   /**
    * Register new user
@@ -36,15 +27,15 @@ class AuthService {
     try {
       logger.info('Registering user', { email: data.email });
       
-      const response = await apiClient.post<AuthResponse>(
-        this.endpoints.register,
+      const response = await client.post<AuthResponse>(
+        this.endpoints.REGISTER,
         data
       );
 
-      await this.saveTokens(response);
+      await this.saveTokens(response.data);
       logger.info('Registration successful');
       
-      return response;
+      return response.data;
     } catch (error) {
       logger.error('Registration failed', error);
       throw error;
@@ -58,15 +49,15 @@ class AuthService {
     try {
       logger.info('Logging in user', { email: data.email });
       
-      const response = await apiClient.post<AuthResponse>(
-        this.endpoints.login,
+      const response = await client.post<AuthResponse>(
+        this.endpoints.LOGIN,
         data
       );
 
-      await this.saveTokens(response);
+      await this.saveTokens(response.data);
       logger.info('Login successful');
       
-      return response;
+      return response.data;
     } catch (error) {
       logger.error('Login failed', error);
       throw error;
@@ -82,7 +73,7 @@ class AuthService {
       
       // Optional: Call backend logout endpoint
       try {
-        await apiClient.post(this.endpoints.logout);
+        await client.post(this.endpoints.LOGOUT);
       } catch (error) {
         // Continue even if backend logout fails
         logger.warn('Backend logout failed', error);
@@ -103,10 +94,10 @@ class AuthService {
     try {
       logger.info('Fetching user profile');
       
-      const response = await apiClient.get<UserResponse>(this.endpoints.profile);
+      const response = await client.get<UserResponse>(this.endpoints.PROFILE);
       
       logger.info('Profile fetched successfully');
-      return response;
+      return response.data;
     } catch (error) {
       logger.error('Failed to fetch profile', error);
       throw error;
@@ -120,13 +111,13 @@ class AuthService {
     try {
       logger.info('Updating user profile');
       
-      const response = await apiClient.put<UserResponse>(
-        this.endpoints.profile,
+      const response = await client.put<UserResponse>(
+        this.endpoints.PROFILE,
         data
       );
       
       logger.info('Profile updated successfully');
-      return response;
+      return response.data;
     } catch (error) {
       logger.error('Failed to update profile', error);
       throw error;
@@ -140,13 +131,13 @@ class AuthService {
     try {
       logger.info('Requesting password reset', { email: data.email });
       
-      const response = await apiClient.post<ForgotPasswordResponse>(
-        this.endpoints.forgotPassword,
+      const response = await client.post<ForgotPasswordResponse>(
+        this.endpoints.FORGOT_PASSWORD,
         data
       );
       
       logger.info('Password reset email sent');
-      return response;
+      return response.data;
     } catch (error) {
       logger.error('Password reset request failed', error);
       throw error;
@@ -160,13 +151,13 @@ class AuthService {
     try {
       logger.info('Verifying OTP', { email: data.email });
       
-      const response = await apiClient.post<VerifyOTPResponse>(
-        this.endpoints.verifyOTP,
+      const response = await client.post<VerifyOTPResponse>(
+        this.endpoints.VERIFY_OTP,
         data
       );
       
       logger.info('OTP verified successfully');
-      return response;
+      return response.data;
     } catch (error) {
       logger.error('OTP verification failed', error);
       throw error;
@@ -180,13 +171,13 @@ class AuthService {
     try {
       logger.info('Resetting password');
       
-      const response = await apiClient.post<ResetPasswordResponse>(
-        this.endpoints.resetPassword,
+      const response = await client.post<ResetPasswordResponse>(
+        this.endpoints.RESET_PASSWORD,
         data
       );
       
       logger.info('Password reset successful');
-      return response;
+      return response.data;
     } catch (error) {
       logger.error('Password reset failed', error);
       throw error;
@@ -200,11 +191,11 @@ class AuthService {
     try {
       logger.info('Getting Google OAuth URL');
       
-      const response = await apiClient.get<{ url: string }>(
-        this.endpoints.googleLogin
+      const response = await client.get<{ url: string }>(
+        this.endpoints.GOOGLE_LOGIN
       );
       
-      return response.url;
+      return response.data.url;
     } catch (error) {
       logger.error('Failed to get Google OAuth URL', error);
       throw error;
@@ -218,15 +209,15 @@ class AuthService {
     try {
       logger.info('Processing Google OAuth callback');
       
-      const response = await apiClient.get<AuthResponse>(
-        this.endpoints.googleCallback,
+      const response = await client.get<AuthResponse>(
+        this.endpoints.GOOGLE_CALLBACK,
         { params: { code, state } }
       );
 
-      await this.saveTokens(response);
+      await this.saveTokens(response.data);
       logger.info('Google login successful');
       
-      return response;
+      return response.data;
     } catch (error) {
       logger.error('Google OAuth callback failed', error);
       throw error;
@@ -254,15 +245,15 @@ class AuthService {
         throw new Error('No refresh token available');
       }
 
-      const response = await apiClient.post<{ token: string }>(
-        this.endpoints.refresh,
+      const response = await client.post<{ token: string }>(
+        this.endpoints.REFRESH,
         { refresh_token: refreshToken }
       );
 
-      await TokenStorage.setAccessToken(response.token);
+      await TokenStorage.setAccessToken(response.data.token);
       logger.info('Token refreshed successfully');
       
-      return response.token;
+      return response.data.token;
     } catch (error) {
       logger.error('Token refresh failed', error);
       await this.logout();

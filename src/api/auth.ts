@@ -1,110 +1,148 @@
 // src/api/auth.ts
+import {
+  AuthResponse,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse,
+  LoginRequest,
+  RegisterRequest,
+  ResetPasswordRequest,
+  ResetPasswordResponse,
+  UserResponse,
+  VerifyOTPRequest,
+  VerifyOTPResponse,
+} from "../types/auth.types";
 import { client } from "./client";
+import { API_ENDPOINTS } from "./endpoints";
 
-/** ===== Types from spec ===== **/
-export type LoginRequest = { email: string; password: string }; // /api/auth/login
-export type RegisterRequest = {
-  username: string; // REQUIRED
-  email: string;    // REQUIRED
-  password: string; // REQUIRED (>= 6)
-  // optional fields (เพิ่มได้ตามสเปก)
-  display_name?: string;
-  phone?: string;
-  birth_date?: string;
-  allergic_drugs?: string;
-  allergic_food?: string;
-  chronic_disease?: string;
-  emergency_contact?: string;
-  food_preferences?: string;
-  food_categories?: string;
-  activities?: string;
+// Re-export types for convenience
+export type {
+  AuthResponse,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse, LoginRequest,
+  RegisterRequest, ResetPasswordRequest,
+  ResetPasswordResponse, UserResponse, VerifyOTPRequest,
+  VerifyOTPResponse
 };
 
-export type UserResponse = {
-  id?: string;
-  username?: string;
-  email?: string;
-  display_name?: string;
-  role?: string;
-  phone?: string;
-  avatar_url?: string;
-  birth_date?: string;
-  created_at?: string;
-  updated_at?: string;
-  // …(field อื่น ๆ ตาม spec เป็น string ทั้งหมด)
-};
+/** ===== Auth API Functions ===== **/
 
-export type AuthResponse = {
-  token: string;
-  user: UserResponse;
-};
-
-export type ForgotPasswordRequest = { email: string };
-export type ForgotPasswordResponse = {
-  email: string;
-  expires_in: string;
-  message: string;
-};
-
-export type VerifyOTPRequest = { email: string; code: string };
-export type VerifyOTPResponse = {
-  reset_token: string;
-  expires_in: string;
-  message: string;
-};
-
-export type ResetPasswordRequest = { reset_token: string; new_password: string };
-export type ResetPasswordResponse = { message: string };
-
-/** ===== Endpoints (ตาม paths ของ spec) ===== **/
+/**
+ * Login user with email and password
+ */
 export async function apiLogin(body: LoginRequest): Promise<AuthResponse> {
-  const { data } = await client.post<AuthResponse>("/api/auth/login", body);
+  const { data } = await client.post<AuthResponse>(API_ENDPOINTS.AUTH.LOGIN, body);
   return data;
 }
 
+/**
+ * Register new user
+ */
 export async function apiRegister(body: RegisterRequest): Promise<AuthResponse> {
-  const { data } = await client.post<AuthResponse>("/api/auth/register", body);
+  const { data } = await client.post<AuthResponse>(API_ENDPOINTS.AUTH.REGISTER, body);
   return data;
 }
 
+/**
+ * Get current user profile
+ */
 export async function apiProfile(): Promise<UserResponse> {
-  const { data } = await client.get<UserResponse>("/api/auth/profile");
+  const { data } = await client.get<UserResponse>(API_ENDPOINTS.AUTH.PROFILE);
   return data;
 }
 
+/**
+ * Update user profile
+ */
+export async function apiUpdateProfile(body: Partial<UserResponse>): Promise<UserResponse> {
+  const { data } = await client.put<UserResponse>(API_ENDPOINTS.AUTH.PROFILE, body);
+  return data;
+}
+
+/**
+ * Logout user
+ */
+export async function apiLogout(): Promise<void> {
+  await client.post(API_ENDPOINTS.AUTH.LOGOUT);
+}
+
+/**
+ * Request password reset
+ */
 export async function apiForgotPassword(
   body: ForgotPasswordRequest
 ): Promise<ForgotPasswordResponse> {
-  const { data } = await client.post<ForgotPasswordResponse>("/api/auth/forgot-password", body);
+  const { data } = await client.post<ForgotPasswordResponse>(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, body);
   return data;
 }
 
+/**
+ * Verify OTP code
+ */
 export async function apiVerifyOTP(
   body: VerifyOTPRequest
 ): Promise<VerifyOTPResponse> {
-  const { data } = await client.post<VerifyOTPResponse>("/api/auth/verify-otp", body);
+  const { data } = await client.post<VerifyOTPResponse>(API_ENDPOINTS.AUTH.VERIFY_OTP, body);
   return data;
 }
 
+/**
+ * Reset password with token
+ */
 export async function apiResetPassword(
   body: ResetPasswordRequest
 ): Promise<ResetPasswordResponse> {
-  const { data } = await client.post<ResetPasswordResponse>("/api/auth/reset-password", body);
+  const { data } = await client.post<ResetPasswordResponse>(API_ENDPOINTS.AUTH.RESET_PASSWORD, body);
   return data;
 }
 
-/** Google OAuth (ถ้าจะใช้บนมือถือควรเปิดผ่าน WebBrowser) */
+/**
+ * Get Google OAuth URL
+ */
 export async function apiGoogleLoginUrl(): Promise<{ url: string }> {
-  const { data } = await client.get<{ url: string }>("/api/auth/google/login");
-  return data;
-}
-export async function apiGoogleCallback(params: { code: string; state?: string }): Promise<AuthResponse> {
-  const { data } = await client.get<AuthResponse>("/api/auth/google/callback", { params });
+  const { data } = await client.get<{ url: string }>(API_ENDPOINTS.AUTH.GOOGLE_LOGIN);
   return data;
 }
 
-/** Health */
+/**
+ * Handle Google OAuth callback
+ */
+export async function apiGoogleCallback(params: { code: string; state?: string }): Promise<AuthResponse> {
+  const { data } = await client.get<AuthResponse>(API_ENDPOINTS.AUTH.GOOGLE_CALLBACK, { params });
+  return data;
+}
+
+/**
+ * Refresh access token
+ */
+export async function apiRefreshToken(refreshToken: string): Promise<{ token: string }> {
+  const { data } = await client.post<{ token: string }>(API_ENDPOINTS.AUTH.REFRESH, {
+    refresh_token: refreshToken
+  });
+  return data;
+}
+
+/** ===== Health Check Functions ===== **/
+
+/**
+ * Basic health check
+ */
 export async function apiHealthz() {
-  const { data } = await client.get("/healthz");
+  const { data } = await client.get(API_ENDPOINTS.HEALTH.HEALTHZ);
+  return data;
+}
+
+/**
+ * Liveness check
+ */
+export async function apiLivez() {
+  const { data } = await client.get(API_ENDPOINTS.HEALTH.LIVEZ);
+  return data;
+}
+
+/**
+ * Readiness check
+ */
+export async function apiReadyz() {
+  const { data } = await client.get(API_ENDPOINTS.HEALTH.READYZ);
   return data;
 }
