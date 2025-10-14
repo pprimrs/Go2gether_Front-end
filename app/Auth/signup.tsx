@@ -1,12 +1,10 @@
 // app/Auth/signup.tsx
-// app/Auth/signup/index.tsx
 import React, { useState } from "react";
 import {
   View,
   Text,
   TextInput,
   Pressable,
-  StyleSheet,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -15,38 +13,60 @@ import {
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { styles } from "./styles/signupstyles";
+import { useAuth } from "../../src/store/authStore";
 
 export default function SignUpScreen() {
   const [tab, setTab] = useState<"login" | "signup">("signup");
-
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [showPw2, setShowPw2] = useState(false);
+  const { signUpWithEmail } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
 
-  const onSubmit = () => {
-    if (!name || !email || !password || !confirm) {
-      return Alert.alert("Oops", "Please fill in all fields.");
-    }
-    if (password.length < 6) {
-      return Alert.alert("Password too short", "At least 6 characters.");
-    }
-    if (password !== confirm) {
-      return Alert.alert("Mismatch", "Passwords do not match.");
-    }
-    // TODO: call your sign-up API
+  const onSubmit = async () => {
+  if (!name || !email || !password || !confirm) {
+    Alert.alert("Oops", "Please fill in all fields.");
+    return;
+  }
+  if (password.length < 6) {
+    Alert.alert("Password too short", "At least 6 characters.");
+    return;
+  }
+  if (password !== confirm) {
+    Alert.alert("Mismatch", "Passwords do not match.");
+    return;
+  }
+  try {
+    setSubmitting(true);
+    await signUpWithEmail({
+      username: name,       // ← SPEC ต้องการ username (required)
+      email,
+      password,
+      display_name: name,   // (optional) เก็บชื่อโชว์
+    });
     router.replace("/(tabs)");
-  };
+  } catch (e: any) {
+    Alert.alert("Sign up failed", e?.response?.data?.message || "Please try again.");
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.select({ ios: "padding" })}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.select({ ios: "padding" })}
+    >
       <View style={styles.screen}>
         {/* ส่วนบน (โลโก้ + ข้อความต้อนรับ) */}
         <View style={styles.topSection}>
           <Image
-            source={require("../../../assets/images/logo.png")}
+            // ปรับ path ให้ตรงกับโครงของคุณ: asset/images/*
+            source={require("../../assets/images/logo.png")}
             style={styles.logo}
             contentFit="contain"
           />
@@ -56,7 +76,7 @@ export default function SignUpScreen() {
           </Text>
         </View>
 
-        {/* ✅ แท็บอยู่นอกกรอบสีฟ้า (เหมือน signin) */}
+        {/* ✅ แท็บอยู่นอกกรอบสีฟ้า */}
         <View style={styles.tabsOuterRow}>
           <Pressable onPress={() => router.replace("/Auth/signin")} style={styles.tabBtn}>
             <Text style={styles.tabText}>Login</Text>
@@ -66,9 +86,13 @@ export default function SignUpScreen() {
           </Pressable>
         </View>
 
-        {/* กรอบสีฟ้าด้านล่าง (layout เดียวกับ signin) */}
+        {/* กรอบสีฟ้าด้านล่าง */}
         <View style={styles.bottomSheet}>
-          <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={styles.sheetContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             {/* Name */}
             <View style={styles.inputWrap}>
               <Ionicons name="person-outline" size={18} color="#6B6B6B" />
@@ -81,7 +105,7 @@ export default function SignUpScreen() {
             </View>
 
             {/* Email */}
-            <View style={[styles.inputWrap, { marginTop: 12 }]}>
+            <View style={styles.inputWrap}>
               <Ionicons name="mail-outline" size={18} color="#6B6B6B" />
               <TextInput
                 style={styles.input}
@@ -94,7 +118,7 @@ export default function SignUpScreen() {
             </View>
 
             {/* Password */}
-            <View style={[styles.inputWrap, { marginTop: 12 }]}>
+            <View style={styles.inputWrap}>
               <Ionicons name="lock-closed-outline" size={18} color="#6B6B6B" />
               <TextInput
                 style={styles.input}
@@ -103,14 +127,18 @@ export default function SignUpScreen() {
                 onChangeText={setPassword}
                 secureTextEntry={!showPw}
               />
-              <Pressable onPress={() => setShowPw(v => !v)}>
-                <Ionicons name={showPw ? "eye-off-outline" : "eye-outline"} size={18} color="#6B6B6B" />
+              <Pressable onPress={() => setShowPw((v) => !v)} style={styles.smallRow}>
+                <Ionicons
+                  name={showPw ? "eye-off-outline" : "eye-outline"}
+                  size={18}
+                  color="#6B6B6B"
+                />
               </Pressable>
             </View>
 
             {/* Confirm Password */}
-            <View style={[styles.inputWrap, { marginTop: 12 }]}>
-              <Ionicons name="lock-closed-outline" size={18} color="#6B6B6B" />
+            <View style={styles.inputWrap}>
+              <Ionicons name="checkmark-circle-outline" size={18} color="#6B6B6B" />
               <TextInput
                 style={styles.input}
                 placeholder="Confirm your password"
@@ -118,8 +146,12 @@ export default function SignUpScreen() {
                 onChangeText={setConfirm}
                 secureTextEntry={!showPw2}
               />
-              <Pressable onPress={() => setShowPw2(v => !v)}>
-                <Ionicons name={showPw2 ? "eye-off-outline" : "eye-outline"} size={18} color="#6B6B6B" />
+              <Pressable onPress={() => setShowPw2((v) => !v)} style={styles.smallRow}>
+                <Ionicons
+                  name={showPw2 ? "eye-off-outline" : "eye-outline"}
+                  size={18}
+                  color="#6B6B6B"
+                />
               </Pressable>
             </View>
 
@@ -130,7 +162,8 @@ export default function SignUpScreen() {
 
             {/* Terms */}
             <Text style={styles.terms}>
-              By signing up, you agree to our <Text style={styles.link}>Terms of {"\n"} service</Text> and{" "}
+              By signing up, you agree to our{" "}
+              <Text style={styles.link}>Terms of service</Text> and{" "}
               <Text style={styles.link}>Privacy policy</Text>
             </Text>
           </ScrollView>
@@ -139,92 +172,5 @@ export default function SignUpScreen() {
     </KeyboardAvoidingView>
   );
 }
-
-/* ====== สไตล์: โคลนจากไฟล์ signin ของคุณ ====== */
-const PRIMARY = "#bcd6e7";
-const TEXT = "#111";
-const MUTED = "#6B6B6B";
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#fff" },
-
-  logo: {
-    width: 300,
-    height: 150,
-  },
-
-  topSection: {
-    marginTop: -35,
-    alignItems: "center",
-    paddingTop: 90,
-    paddingHorizontal: 10,
-    paddingBottom: 8,
-  },
-  title: { fontSize: 25, fontWeight: "800", color: TEXT, marginTop: 8 },
-  subtitle: { marginTop: 20, fontSize: 14, lineHeight: 18, color: "#959595", textAlign: "center" },
-
-  tabsOuterRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingHorizontal: 10,
-    marginBottom: -15,
-    borderBottomColor: "#c8d9eb",
-    zIndex: 1,
-  },
-  tabBtn: { paddingHorizontal: 8, paddingVertical: 16 },
-  tabText: { fontSize: 17, color: MUTED, fontWeight: "700" },
-  tabActive: {
-    color: "#2f6fa0",
-    paddingBottom: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: "#2f6fa0",
-  },
-
-  bottomSheet: {
-    flex: 1,
-    backgroundColor: "#eaf4fb",
-    borderWidth: 1,
-    borderTopWidth: 0,
-    borderColor: "#e7eef5",
-    marginTop: -3,
-  },
-  sheetContent: { padding: 16 },
-
-  inputWrap: {
-    width: "85%",
-    alignSelf: "center",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 25,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    paddingHorizontal: 15,
-    height: 53,
-    borderWidth: 1,
-    borderColor: "#eee",
-  },
-  input: { flex: 1, fontSize: 16, color: "#959595" },
-
-  btn: {
-    width: "85%",
-    alignSelf: "center",
-    alignItems: "center",
-    height: 53,
-    borderRadius: 12,
-    justifyContent: "center",
-    marginTop: 36,
-  },
-  btnPrimary: { backgroundColor: "#9ACBE2" },
-  btnText: { fontSize: 20, fontWeight: "800" },
-  btnPrimaryText: { color: "#0B2A3A" },
-
-  terms: {
-    marginTop: 20,
-    fontSize: 13,
-    color: MUTED,
-    textAlign: "center",
-  },
-  link: { textDecorationLine: "underline", color: "#2f6fa0", fontWeight: "600" },
-});
 
 
