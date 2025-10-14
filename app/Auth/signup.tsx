@@ -46,7 +46,7 @@ export default function SignUpScreen() {
         {/* ส่วนบน (โลโก้ + ข้อความต้อนรับ) */}
         <View style={styles.topSection}>
           <Image
-            source={require("../../assets/images/logo.png")}
+            source={require("../../../assets/images/logo.png")}
             style={styles.logo}
             contentFit="contain"
           />

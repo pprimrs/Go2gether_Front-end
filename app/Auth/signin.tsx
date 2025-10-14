@@ -27,7 +27,7 @@ export default function SignInScreen() {
       {/* ส่วนบน (โลโก้ + หัวข้อ) */}
       <View style={styles.topSection}>
         <Image
-          source={require("../../assets/images/logo.png")}
+          source={require("../../../assets/images/logo.png")}
           style={styles.logo}
           contentFit="contain"
         />
