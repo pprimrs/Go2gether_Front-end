@@ -1,42 +1,39 @@
 // app/Auth/signin.tsx
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
+  View, Text, TextInput, Pressable, ScrollView,
+  KeyboardAvoidingView, Platform, Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { styles } from "./styles/signinstyles"; // ✅ ชื่อไฟล์สไตล์ถูก
-import { useAuth } from "../../src/store/authStore";            // ✅ ใช้ context/hook ของคุณ
-// ถ้าไฟล์จริงคือ src/store/auth.ts ให้เปลี่ยนเป็น "../../src/store/auth"
+import { styles } from "./styles/signinstyles";
+// ถ้า store ของคุณคือ src/store/auth ให้ใช้บรรทัดด้านล่าง
+import { useAuth } from "../../src/store/authStore"; 
+// ถ้าไฟล์จริงใช้ชื่อ authStore ก็เปลี่ยน path ให้ตรง
 
 export default function SignInScreen() {
-  const { signInWithEmail } = useAuth();                      // ✅ ดึง action จาก context
+  const { signInWithEmail } = useAuth();
 
   const [tab, setTab] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [submitting, setSubmitting] = useState(false);        // ✅ ประกาศ state
+  const [submitting, setSubmitting] = useState(false);
+
+  const canSubmit = email.trim().length > 0 && password.trim().length > 0;
 
   const onGoogle = () => Alert.alert("Google", "Connect your Google sign-in here.");
   const onForgot = () => router.push("/Auth/forgot-password");
 
   const onSubmit = async () => {
-    if (!email || !password) {
-      Alert.alert("Oops", "Please enter email and password.");
+    if (!canSubmit) {
+      Alert.alert("Required", "Please enter your email and password.");
       return;
     }
     try {
       setSubmitting(true);
-      await signInWithEmail({ email, password });             // ✅ ใช้ฟังก์ชันตามไฟล์ของคุณ
+      await signInWithEmail({ email: email.trim(), password });
       router.replace("/(tabs)");
     } catch (e: any) {
       console.log("SignIn error:", e?.response?.data || e?.message);
@@ -49,19 +46,11 @@ export default function SignInScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.select({ ios: "padding" })}>
       <View style={styles.screen}>
-        {/* ส่วนบน (โลโก้ + หัวข้อ) */}
+        {/* ส่วนบน */}
         <View style={styles.topSection}>
-          <Image
-            // เลือกให้ตรงกับโปรเจกต์คุณ (asset vs assets)
-            source={require("../../assets/images/logo.png")}
-            // source={require("../../assets/images/logo.png")}
-            style={styles.logo}
-            contentFit="contain"
-          />
+          <Image source={require("../../assets/images/logo.png")} style={styles.logo} contentFit="contain" />
           <Text style={styles.title}>Welcome to Go2gether</Text>
-          <Text style={styles.subtitle}>
-            Sign up or login below to{"\n"}create your plan trip
-          </Text>
+          <Text style={styles.subtitle}>Sign up or login below to{"\n"}create your plan trip</Text>
         </View>
 
         {/* แท็บ */}
@@ -100,6 +89,7 @@ export default function SignInScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+                returnKeyType="next"
               />
             </View>
 
@@ -112,19 +102,19 @@ export default function SignInScreen() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPw}
+                returnKeyType="done"
+                onSubmitEditing={() =>
+                  canSubmit ? onSubmit() : Alert.alert("Required", "Please enter your email and password.")
+                }
               />
               <Pressable
-                onPress={() => setShowPw((v) => !v)}
+                onPress={() => setShowPw(v => !v)}
                 hitSlop={10}
                 accessibilityRole="button"
                 accessibilityLabel={showPw ? "Hide password" : "Show password"}
                 style={styles.smallRow}
               >
-                <Ionicons
-                  name={showPw ? "eye-off-outline" : "eye-outline"}
-                  size={18}
-                  color="#6B6B6B"
-                />
+                <Ionicons name={showPw ? "eye-off-outline" : "eye-outline"} size={18} color="#6B6B6B" />
               </Pressable>
             </View>
 
@@ -135,9 +125,14 @@ export default function SignInScreen() {
 
             {/* Submit */}
             <Pressable
-              style={[styles.btn, styles.btnPrimary, submitting && { opacity: 0.6 }]}
+              style={[
+                styles.btn,
+                styles.btnPrimary,
+                (!canSubmit || submitting) && { opacity: 0.6 }, // ดูเป็น disabled ชัดเจน
+              ]}
               onPress={onSubmit}
-              disabled={submitting}
+              disabled={!canSubmit || submitting}
+              accessibilityState={{ disabled: !canSubmit || submitting }}
             >
               <Text style={[styles.btnText, styles.btnPrimaryText]}>
                 {submitting ? "Signing in..." : "Sign in"}
@@ -155,5 +150,6 @@ export default function SignInScreen() {
     </KeyboardAvoidingView>
   );
 }
+
 
 

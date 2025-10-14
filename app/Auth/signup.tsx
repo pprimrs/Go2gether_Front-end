@@ -1,4 +1,4 @@
-// app/Auth/signup.tsx
+// app/Auth/signin.tsx
 import React, { useState } from "react";
 import {
   View,
@@ -13,61 +13,48 @@ import {
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { styles } from "./styles/signupstyles";
-import { useAuth } from "../../src/store/authStore";
+import { styles } from "./styles/signinstyles"; // ✅ ชื่อไฟล์สไตล์ถูก
+import { useAuth } from "../../src/store/authStore";            // ✅ ใช้ context/hook ของคุณ
+// ถ้าไฟล์จริงคือ src/store/auth.ts ให้เปลี่ยนเป็น "../../src/store/auth"
 
-export default function SignUpScreen() {
-  const [tab, setTab] = useState<"login" | "signup">("signup");
-  const [name, setName] = useState("");
+export default function SignInScreen() {
+  const { signInWithEmail } = useAuth();                      // ✅ ดึง action จาก context
+
+  const [tab, setTab] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [showPw2, setShowPw2] = useState(false);
-  const { signUpWithEmail } = useAuth();
-  const [submitting, setSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);        // ✅ ประกาศ state
+
+  const onGoogle = () => Alert.alert("Google", "Connect your Google sign-in here.");
+  const onForgot = () => router.push("/Auth/forgot-password");
 
   const onSubmit = async () => {
-    if (!name || !email || !password || !confirm) {
-      Alert.alert("Oops", "Please fill in all fields.");
-      return;
-    }
-    if (password.length < 6) {
-      Alert.alert("Password too short", "At least 6 characters.");
-      return;
-    }
-    if (password !== confirm) {
-      Alert.alert("Mismatch", "Passwords do not match.");
+    if (!email || !password) {
+      Alert.alert("Oops", "Please enter email and password.");
       return;
     }
     try {
       setSubmitting(true);
-      await signUpWithEmail({
-        email,
-        password,
-        username: name,
-        display_name: name,
-        name,
-      });
+      await signInWithEmail({ email, password });             // ✅ ใช้ฟังก์ชันตามไฟล์ของคุณ
       router.replace("/(tabs)");
     } catch (e: any) {
-      Alert.alert("Sign up failed", e?.response?.data?.message || "Please try again.");
+      console.log("SignIn error:", e?.response?.data || e?.message);
+      Alert.alert("Sign in failed", e?.response?.data?.message ?? "Please try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.select({ ios: "padding" })}
-      pointerEvents="box-none" // ✅ อย่าขวางทัช
-    >
-      <View style={[styles.screen]} pointerEvents="box-none">
-        {/* ส่วนบน (โลโก้ + ข้อความต้อนรับ) */}
-        <View style={styles.topSection} pointerEvents="box-none">
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.select({ ios: "padding" })}>
+      <View style={styles.screen}>
+        {/* ส่วนบน (โลโก้ + หัวข้อ) */}
+        <View style={styles.topSection}>
           <Image
+            // เลือกให้ตรงกับโปรเจกต์คุณ (asset vs assets)
             source={require("../../assets/images/logo.png")}
+            // source={require("../../assets/images/logo.png")}
             style={styles.logo}
             contentFit="contain"
           />
@@ -77,43 +64,30 @@ export default function SignUpScreen() {
           </Text>
         </View>
 
-        {/* แท็บอยู่นอกกรอบสีฟ้า */}
-        <View
-          style={[styles.tabsOuterRow, { zIndex: 1 }]} // ✅ วางบนสุดเฉพาะแถบนี้
-          // ถ้าเป็น overlay ยาวผิดปกติ ให้ตัดทัชออกไปเลย:
-          pointerEvents="auto"
-        >
-          <Pressable onPress={() => router.replace("/Auth/signin")} style={styles.tabBtn}>
-            <Text style={styles.tabText}>Login</Text>
+        {/* แท็บ */}
+        <View style={styles.tabsOuterRow}>
+          <Pressable onPress={() => setTab("login")} style={styles.tabBtn}>
+            <Text style={[styles.tabText, tab === "login" && styles.tabActive]}>Login</Text>
           </Pressable>
-          <Pressable onPress={() => setTab("signup")} style={styles.tabBtn}>
-            <Text style={[styles.tabText, styles.tabActive]}>Sign Up</Text>
+          <Pressable onPress={() => router.replace("/Auth/signup")} style={styles.tabBtn}>
+            <Text style={styles.tabText}>Sign Up</Text>
           </Pressable>
         </View>
 
-        {/* กรอบสีฟ้าด้านล่าง */}
-        <View
-          style={[
-            styles.bottomSheet,
-            { position: "relative", zIndex: 0, overflow: "visible" }, // ✅ กัน overlay ทับปุ่ม
-          ]}
-          pointerEvents="box-none"
-        >
+        {/* ฟอร์ม */}
+        <View style={styles.bottomSheet}>
           <ScrollView
-            contentContainerStyle={[styles.sheetContent, { paddingBottom: 32 }]}
+            contentContainerStyle={styles.sheetContent}
             showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="always" // ✅ ให้ทัชวิ่งลงมาถึงปุ่ม
+            keyboardShouldPersistTaps="handled"
           >
-            {/* Name */}
-            <View style={styles.inputWrap}>
-              <Ionicons name="person-outline" size={18} color="#6B6B6B" />
-              <TextInput
-                style={styles.input}
-                placeholder="Your name"
-                value={name}
-                onChangeText={setName}
-              />
-            </View>
+            {/* Google */}
+            <Pressable style={styles.googleBtn} onPress={onGoogle}>
+              <Ionicons name="logo-google" size={18} color="#000" />
+              <Text style={styles.googleText}>Login with Google</Text>
+            </Pressable>
+
+            <Text style={styles.orText}>or continue with email</Text>
 
             {/* Email */}
             <View style={styles.inputWrap}>
@@ -125,6 +99,7 @@ export default function SignUpScreen() {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoCorrect={false}
               />
             </View>
 
@@ -138,44 +113,40 @@ export default function SignUpScreen() {
                 onChangeText={setPassword}
                 secureTextEntry={!showPw}
               />
-              <Pressable onPress={() => setShowPw((v) => !v)} style={styles.smallRow}>
-                <Ionicons name={showPw ? "eye-off-outline" : "eye-outline"} size={18} color="#6B6B6B" />
-              </Pressable>
-            </View>
-
-            {/* Confirm Password */}
-            <View style={styles.inputWrap}>
-              <Ionicons name="checkmark-circle-outline" size={18} color="#6B6B6B" />
-              <TextInput
-                style={styles.input}
-                placeholder="Confirm your password"
-                value={confirm}
-                onChangeText={setConfirm}
-                secureTextEntry={!showPw2}
-              />
-              <Pressable onPress={() => setShowPw2((v) => !v)} style={styles.smallRow}>
-                <Ionicons name={showPw2 ? "eye-off-outline" : "eye-outline"} size={18} color="#6B6B6B" />
-              </Pressable>
-            </View>
-
-            {/* ปุ่มสมัคร */}
-            <View style={{ position: "relative", zIndex: 2 }}>
               <Pressable
-                style={[styles.btn, styles.btnPrimary]}
-                onPress={onSubmit}
-                disabled={submitting}
-                onPressIn={() => console.log("Create account pressed in")} // debug ชั่วคราว
+                onPress={() => setShowPw((v) => !v)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={showPw ? "Hide password" : "Show password"}
+                style={styles.smallRow}
               >
-                <Text style={[styles.btnText, styles.btnPrimaryText]}>
-                  {submitting ? "Creating..." : "Create account"}
-                </Text>
+                <Ionicons
+                  name={showPw ? "eye-off-outline" : "eye-outline"}
+                  size={18}
+                  color="#6B6B6B"
+                />
               </Pressable>
             </View>
+
+            {/* Forgot */}
+            <Pressable onPress={onForgot} style={{ marginTop: 8 }}>
+              <Text style={styles.forgot}>Forgot Password?</Text>
+            </Pressable>
+
+            {/* Submit */}
+            <Pressable
+              style={[styles.btn, styles.btnPrimary, submitting && { opacity: 0.6 }]}
+              onPress={onSubmit}
+              disabled={submitting}
+            >
+              <Text style={[styles.btnText, styles.btnPrimaryText]}>
+                {submitting ? "Signing in..." : "Sign in"}
+              </Text>
+            </Pressable>
 
             {/* Terms */}
             <Text style={styles.terms}>
-              By signing up, you agree to our{" "}
-              <Text style={styles.link}>Terms of service</Text> and{" "}
+              By signing up, you agree to our <Text style={styles.link}>Terms of service</Text> and{" "}
               <Text style={styles.link}>Privacy policy</Text>
             </Text>
           </ScrollView>
