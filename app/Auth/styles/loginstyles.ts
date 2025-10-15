@@ -30,7 +30,7 @@ export const styles = StyleSheet.create({
     borderTopWidth: 0,
     borderColor: BORDER,
   },
-  sheetContent: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 20, gap: 14 },
+  sheetContent: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 20, gap: 12 },
 
   googleBtn: {
     marginTop: 10,
@@ -62,8 +62,32 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#eee',
   },
+  inputWrapError: {
+    borderColor: '#EF4444',
+  },
   input: { flex: 1, fontSize: 16, color: '#333' },
   smallRow: { flexDirection: 'row', alignItems: 'center' },
+
+  errorText: {
+    width: '85%',
+    alignSelf: 'center',
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  formError: {
+    width: '85%',
+    alignSelf: 'center',
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FCA5A5',
+    borderWidth: 1,
+    color: '#991B1B',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    fontSize: 13,
+  },
 
   forgot: { fontSize: 12, color: '#746E6E', marginTop: 8, alignSelf: 'stretch', textAlign: 'left', marginHorizontal: 34 },
 
@@ -77,7 +101,7 @@ export const styles = StyleSheet.create({
     marginTop: 16,
   },
   btnText: { fontSize: 20, fontWeight: '800' },
-  btnPrimary: { marginTop: 36, backgroundColor: '#9ACBE2' },
+  btnPrimary: { marginTop: 12, backgroundColor: '#9ACBE2' },
   btnPrimaryText: { color: '#0B2A3A' },
 
   terms: { marginTop: 20, fontSize: 13, color: MUTED, textAlign: 'center' },

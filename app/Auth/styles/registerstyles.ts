@@ -37,7 +37,7 @@ export const styles = StyleSheet.create({
     borderTopWidth: 0,
     borderColor: BORDER,
   },
-  sheetContent: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 24, gap: 14 },
+  sheetContent: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 24, gap: 10 },
 
   inputWrap: {
     width: '85%',
@@ -51,12 +51,22 @@ export const styles = StyleSheet.create({
     height: 53,
     borderWidth: 1,
     borderColor: '#eee',
-    marginTop: 12,
+    marginTop: 10,
+  },
+  inputWrapError: {
+    borderColor: '#EF4444', // แดงเมื่อ error
   },
   input: { flex: 1, fontSize: 16, color: '#333' },
   smallRow: { flexDirection: 'row', alignItems: 'center' },
 
-  // ปุ่มหลัก
+  errorText: {
+    width: '85%',
+    alignSelf: 'center',
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 4,
+  },
+
   btn: {
     width: '85%',
     alignSelf: 'center',
@@ -64,16 +74,15 @@ export const styles = StyleSheet.create({
     height: 53,
     borderRadius: 12,
     justifyContent: 'center',
-    marginTop: 24,
+    marginTop: 18,
   },
   btnText: { fontSize: 20, fontWeight: '800' },
 
-  // สีปุ่ม (พร้อมสถานะ disabled)
   btnPrimary: { backgroundColor: '#9ACBE2' },
-  btnPrimaryDisabled: { backgroundColor: '#DCEBF3' }, // สีอ่อนเมื่อยังกรอกไม่ครบ
+  btnPrimaryDisabled: { backgroundColor: '#DCEBF3' },
   btnPrimaryText: { color: '#0B2A3A' },
   btnDisabledText: { color: '#7C9AAA' },
 
-  terms: { marginTop: 20, fontSize: 13, color: MUTED, textAlign: 'center', lineHeight: 18 },
+  terms: { marginTop: 14, fontSize: 13, color: MUTED, textAlign: 'center', lineHeight: 18 },
   link: { textDecorationLine: 'underline', color: '#2f6fa0', fontWeight: '600' },
 });
