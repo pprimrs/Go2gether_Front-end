@@ -1,309 +1,151 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
+// app/index.tsx  ← หน้าแรก (Welcome)
+import { router } from 'expo-router';
 import React from 'react';
-import { Image as RNImage, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { ThemedText } from '../../components/themed-text';
-import { ThemedView } from '../../components/themed-view';
+import { ScrollView, StyleSheet, View, Text, TouchableOpacity, Platform, Image } from 'react-native';
 
-const hero = require("../../assets/images/home-page.png");
-
-export default function HomeTab() {
-  const quickActions = [
-    {
-      title: 'Find Events',
-      icon: 'search-outline',
-      color: '#4CAF50',
-      href: '/(tabs)/explore',
-    },
-    {
-      title: 'Create Event',
-      icon: 'add-circle-outline',
-      color: '#2196F3',
-      href: '/(tabs)/planning',
-    },
-    {
-      title: 'My Profile',
-      icon: 'person-outline',
-      color: '#FF9800',
-      href: '/(tabs)/profile',
-    },
-  ];
-
-  const upcomingEvents = [
-    {
-      id: 1,
-      title: 'Weekend Hiking Adventure',
-      date: 'Jan 15, 2024',
-      time: '8:00 AM',
-      location: 'Mountain Trail',
-      participants: 8,
-      maxParticipants: 12,
-    },
-    {
-      id: 2,
-      title: 'Coffee & Networking',
-      date: 'Jan 18, 2024',
-      time: '2:00 PM',
-      location: 'Downtown Cafe',
-      participants: 5,
-      maxParticipants: 10,
-    },
-  ];
+export default function WelcomeScreen() {
+  const onSignIn = () => router.replace('/Auth/login');
+  const onSignUp = () => router.replace('/Auth/register');
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <ThemedView style={styles.content}>
-        {/* Hero Section */}
-        <View style={styles.heroSection}>
-          <RNImage source={hero} style={styles.heroImage} />
-          <ThemedText type="title" style={styles.heroTitle}>
-            Welcome to Go2gether
-          </ThemedText>
-          <ThemedText type="default" style={styles.heroSubtitle}>
-            Connect with amazing people and create unforgettable experiences together
-          </ThemedText>
-        </View>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      {/* โลโก้ */}
+      <Image
+        source={require('../../assets/images/logo.png')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
 
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>
-            Quick Actions
-          </ThemedText>
-          <View style={styles.quickActionsGrid}>
-            {quickActions.map((action, index) => (
-              <Link key={index} href={action.href} asChild>
-                <TouchableOpacity style={[styles.actionCard, { borderLeftColor: action.color }]}>
-                  <Ionicons name={action.icon as any} size={24} color={action.color} />
-                  <ThemedText type="defaultSemiBold" style={styles.actionTitle}>
-                    {action.title}
-                  </ThemedText>
-                </TouchableOpacity>
-              </Link>
-            ))}
-          </View>
-        </View>
+      {/* ภาพประกอบ */}
+      <Image
+        source={require('../../assets/images/home-page.png')}
+        style={styles.hero}
+        resizeMode="contain"
+      />
 
-        {/* Upcoming Events */}
-        <View style={styles.section}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>
-            Upcoming Events
-          </ThemedText>
-          {upcomingEvents.map((event) => (
-            <TouchableOpacity key={event.id} style={styles.eventCard}>
-              <View style={styles.eventHeader}>
-                <ThemedText type="defaultSemiBold" style={styles.eventTitle}>
-                  {event.title}
-                </ThemedText>
-                <ThemedText type="default" style={styles.eventDate}>
-                  {event.date}
-                </ThemedText>
-              </View>
-              <View style={styles.eventDetails}>
-                <View style={styles.eventDetail}>
-                  <Ionicons name="time-outline" size={16} color="#666" />
-                  <ThemedText type="default" style={styles.eventDetailText}>
-                    {event.time}
-                  </ThemedText>
-                </View>
-                <View style={styles.eventDetail}>
-                  <Ionicons name="location-outline" size={16} color="#666" />
-                  <ThemedText type="default" style={styles.eventDetailText}>
-                    {event.location}
-                  </ThemedText>
-                </View>
-                <View style={styles.eventDetail}>
-                  <Ionicons name="people-outline" size={16} color="#666" />
-                  <ThemedText type="default" style={styles.eventDetailText}>
-                    {event.participants}/{event.maxParticipants} participants
-                  </ThemedText>
-                </View>
-              </View>
-              <View style={styles.progressBar}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width: `${(event.participants / event.maxParticipants) * 100}%`,
-                    },
-                  ]}
-                />
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+      {/* ข้อความหัว/คำอธิบาย */}
+      <Text style={styles.title}>Plan and Go2gether</Text>
+      <Text style={styles.subtitle}>
+        The easiest way to turn{'\n'}
+        “we should travel” into real{'\n'}
+        tickets and shared memories.{'\n'}
+        Vote on places, drop pins, and{'\n'}
+        keep all trip talk in one spot.{'\n'}
+        Plan confidently and Go2gether
+      </Text>
 
-        {/* Call to Action */}
-        <View style={styles.ctaSection}>
-          <ThemedText type="subtitle" style={styles.ctaTitle}>
-            Ready to Get Started?
-          </ThemedText>
-          <ThemedText type="default" style={styles.ctaSubtitle}>
-            Join our community and start discovering amazing events near you
-          </ThemedText>
-          <Link href="/(tabs)/explore" asChild>
-            <TouchableOpacity style={styles.ctaButton}>
-              <ThemedText type="defaultSemiBold" style={styles.ctaButtonText}>
-                Explore Events
-              </ThemedText>
-              <Ionicons name="arrow-forward" size={20} color="white" />
-            </TouchableOpacity>
-          </Link>
-        </View>
-      </ThemedView>
+      {/* ปุ่ม */}
+      <View style={styles.actions}>
+        <TouchableOpacity onPress={onSignIn} style={styles.primaryBtn} activeOpacity={0.85}>
+          <Text style={styles.primaryBtnText}>Sign in</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={onSignUp} style={styles.secondaryBtn} activeOpacity={0.9}>
+          <Text style={styles.secondaryBtnText}>Sign up</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
 
+/* ===== Styles ===== */
+const COLORS = {
+  bg: '#FFFFFF',
+  text: '#111111',
+  subtitle: '#7E7E7E',
+  blueFill: '#BCD6E7',   // ปุ่มฟ้าอ่อน
+  border: '#EAEAEA',     // เส้นขอบปุ่มขาว
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: COLORS.bg,
   },
   content: {
-    flex: 1,
-  },
-  heroSection: {
-    alignItems: 'center',
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: 'white',
-  },
-  heroImage: {
-    width: 200,
-    height: 120,
-    resizeMode: 'contain',
-    marginBottom: 20,
-  },
-  heroTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  heroSubtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    opacity: 0.7,
-    lineHeight: 24,
-  },
-  section: {
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  actionCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    width: '30%',
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  actionTitle: {
-    marginTop: 8,
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  eventCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  eventHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  eventTitle: {
-    flex: 1,
-    fontSize: 16,
-  },
-  eventDate: {
-    fontSize: 12,
-    opacity: 0.6,
-  },
-  eventDetails: {
-    marginBottom: 12,
-  },
-  eventDetail: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  eventDetailText: {
-    marginLeft: 8,
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#4CAF50',
-  },
-  ctaSection: {
-    backgroundColor: '#2196F3',
-    margin: 20,
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-  },
-  ctaTitle: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  ctaSubtitle: {
-    color: 'white',
-    fontSize: 14,
-    opacity: 0.9,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  ctaButton: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+    paddingTop: 48,
     paddingHorizontal: 24,
-    paddingVertical: 12,
-    flexDirection: 'row',
+    paddingBottom: 36,
     alignItems: 'center',
   },
-  ctaButtonText: {
-    color: '#2196F3',
-    fontSize: 16,
-    fontWeight: '600',
-    marginRight: 8,
+
+  // โลโก้
+  logo: {
+    width: 220,
+    height: 80,
+    marginTop: 12,
+    alignSelf: 'center',
+  },
+
+  // ภาพประกอบ
+  hero: {
+    width: '86%',
+    height: 160,
+    marginTop: 12,
+    marginBottom: 16,
+    alignSelf: 'center',
+  },
+
+  // ข้อความ
+  title: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: COLORS.text,
+    textAlign: 'center',
+    marginTop: 12,
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: COLORS.subtitle,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+
+  // ปุ่ม
+  actions: {
+    width: '100%',
+    marginTop: 8,
+    gap: 14,
+  },
+  primaryBtn: {
+    height: 56,
+    borderRadius: 14,
+    backgroundColor: COLORS.blueFill,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOpacity: Platform.OS === 'ios' ? 0.06 : 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  primaryBtnText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.text, // ตัวอักษรสีเข้มบนพื้นฟ้า
+  },
+
+  secondaryBtn: {
+    height: 56,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  secondaryBtnText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.text,
   },
 });
-
-

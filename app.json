@@ -8,6 +8,15 @@
     "scheme": "go2gether",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
+    "linking": {
+      "schemes": ["go2gether"],
+      "prefixes": ["go2gether://", "http://localhost:8081"],
+      "config": {
+        "screens": {
+          "callback": "callback"
+        }
+      }
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.go2gether.app"

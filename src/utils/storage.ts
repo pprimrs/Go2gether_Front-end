@@ -116,5 +116,9 @@ export const TokenStorage = {
   getAccessToken: () => storage.getToken('auth_token'),
   setRefreshToken: (token: string) => storage.setToken('refresh_token', token),
   getRefreshToken: () => storage.getToken('refresh_token'),
+  setItem: (key: string, value: string) => storage.setToken(key, value),
+  getItem: (key: string) => storage.getToken(key),
+  setObject: <T>(key: string, value: T) => storage.setObject(key, value),
+  getObject: <T>(key: string) => storage.getObject<T>(key),
   clearTokens: () => storage.clearAll(),
 };

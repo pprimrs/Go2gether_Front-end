@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -12,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { authService } from '../../src/api/services/auth.service';
 import { styles } from './styles/loginstyles'; // ← ดึง style แยกไฟล์
 
 export default function LoginScreen() {
@@ -67,6 +69,30 @@ export default function LoginScreen() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    try {
+      setLoading(true);
+      const response = await authService.getGoogleAuthUrl();
+      
+      // เปิด URL ใน browser และให้ redirect กลับมาที่ callback page
+      try {
+        const supported = await Linking.canOpenURL(response.auth_url);
+        if (supported) {
+          await Linking.openURL(response.auth_url);
+        } else {
+          Alert.alert('Error', 'Cannot open Google login URL');
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Failed to open Google login URL');
+      }
+      
+    } catch (error) {
+      Alert.alert('Error', 'Failed to get Google login URL. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 🔹 สำหรับ UI
   const [tab, setTab] = useState<'login' | 'signup'>('login');
   const submitting = loading;
@@ -100,9 +126,15 @@ export default function LoginScreen() {
         <View style={styles.bottomSheet}>
           <ScrollView contentContainerStyle={styles.sheetContent} keyboardShouldPersistTaps="handled">
             {/* Google */}
-            <Pressable style={styles.googleBtn} onPress={() => Alert.alert('Google Login', 'Coming soon!')}>
+            <Pressable 
+              style={[styles.googleBtn, loading && { opacity: 0.6 }]} 
+              onPress={handleGoogleLogin}
+              disabled={loading}
+            >
               <Ionicons name="logo-google" size={18} color="#000" />
-              <Text style={styles.googleText}>Login with Google</Text>
+              <Text style={styles.googleText}>
+                {loading ? 'Loading...' : 'Login with Google'}
+              </Text>
             </Pressable>
 
             <Text style={styles.orText}>or continue with email</Text>

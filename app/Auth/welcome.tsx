@@ -1,234 +1,161 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
+// app/Welcome/index.tsx  (เปลี่ยนพาธไฟล์ตามโปรเจ็กต์จริง)
+import { router, Link } from 'expo-router';
 import React from 'react';
 import {
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View
+  ScrollView,
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  Platform,
 } from 'react-native';
-import { ThemedText } from '../../components/themed-text';
-import { ThemedView } from '../../components/themed-view';
+import { Image } from 'expo-image';
 
 export default function WelcomeScreen() {
-  const features = [
-    {
-      icon: 'people-outline',
-      title: 'Connect with Others',
-      description: 'Find and join events with like-minded people in your area',
-    },
-    {
-      icon: 'calendar-outline',
-      title: 'Create Events',
-      description: 'Organize your own events and invite others to join',
-    },
-    {
-      icon: 'location-outline',
-      title: 'Local Discovery',
-      description: 'Discover exciting activities happening near you',
-    },
-    {
-      icon: 'heart-outline',
-      title: 'Build Community',
-      description: 'Build lasting friendships through shared experiences',
-    },
-  ];
+  const onSignIn = () => router.replace('/Auth/login');
+  const onSignUp = () => router.replace('/Auth/register');
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <ThemedView style={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <View style={styles.logo}>
-              <Ionicons name="people" size={40} color="#2196F3" />
-            </View>
-          </View>
-          <ThemedText type="title" style={styles.title}>
-            Welcome to Go2gether
-          </ThemedText>
-          <ThemedText type="default" style={styles.subtitle}>
-            Connect, create, and discover amazing experiences together
-          </ThemedText>
-        </View>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      {/* โลโก้ */}
+      <Image
+        source={require('../../assets/images/logo.png')}
+        style={styles.logo}
+        contentFit="contain"
+      />
 
-        {/* Features */}
-        <View style={styles.featuresContainer}>
-          {features.map((feature, index) => (
-            <View key={index} style={styles.featureItem}>
-              <View style={styles.featureIcon}>
-                <Ionicons name={feature.icon as any} size={24} color="#2196F3" />
-              </View>
-              <View style={styles.featureContent}>
-                <ThemedText type="defaultSemiBold" style={styles.featureTitle}>
-                  {feature.title}
-                </ThemedText>
-                <ThemedText type="default" style={styles.featureDescription}>
-                  {feature.description}
-                </ThemedText>
-              </View>
-            </View>
-          ))}
-        </View>
+      {/* ภาพประกอบ */}
+      <Image
+        // ใช้รูปที่คุณมี เช่น home-page.png
+        source={require('../../assets/images/home-page.png')}
+        style={styles.hero}
+        contentFit="contain"
+      />
 
-        {/* Action Buttons */}
-        <View style={styles.actionsContainer}>
-          <Link href="/register" asChild>
-            <TouchableOpacity style={styles.primaryButton}>
-              <ThemedText type="defaultSemiBold" style={styles.primaryButtonText}>
-                Get Started
-              </ThemedText>
-              <Ionicons name="arrow-forward" size={20} color="white" />
-            </TouchableOpacity>
-          </Link>
+      {/* หัวข้อ/คำอธิบาย */}
+      <Text style={styles.title}>Plan and Go2gether</Text>
+      <Text style={styles.subtitle}>
+        The easiest way to turn{'\n'}
+        “we should travel” into real{'\n'}
+        tickets and shared memories.{'\n'}
+        Vote on places, drop pins, and{'\n'}
+        keep all trip talk in one spot.{'\n'}
+        Plan confidently and Go2gether
+      </Text>
 
-          <Link href="/login" asChild>
-            <TouchableOpacity style={styles.secondaryButton}>
-              <ThemedText type="defaultSemiBold" style={styles.secondaryButtonText}>
-                I Already Have an Account
-              </ThemedText>
-            </TouchableOpacity>
-          </Link>
-        </View>
+      {/* ปุ่มการกระทำ */}
+      <View style={styles.actions}>
+        <TouchableOpacity onPress={onSignIn} style={styles.primaryBtn} activeOpacity={0.8}>
+          <Text style={styles.primaryBtnText}>Sign in</Text>
+        </TouchableOpacity>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <ThemedText type="default" style={styles.footerText}>
-            By continuing, you agree to our{' '}
-            <ThemedText type="link" style={styles.linkText}>
-              Terms of Service
-            </ThemedText>{' '}
-            and{' '}
-            <ThemedText type="link" style={styles.linkText}>
-              Privacy Policy
-            </ThemedText>
-          </ThemedText>
-        </View>
-      </ThemedView>
+        <TouchableOpacity onPress={onSignUp} style={styles.secondaryBtn} activeOpacity={0.85}>
+          <Text style={styles.secondaryBtnText}>Sign up</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
 
+/* ===== Styles (ให้โทนและสัดส่วนเหมือนภาพ) ===== */
+const COLORS = {
+  bg: '#FFFFFF',
+  text: '#111111',
+  muted: '#7C7C7C',
+  blueFill: '#BCD6E7', // ฟ้าพาสเทลของปุ่ม Sign in
+  blueText: '#0B2A3A',
+  border: '#EAEAEA',
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: COLORS.bg,
   },
   content: {
-    flex: 1,
-    padding: 20,
-  },
-  header: {
+    paddingTop: 48,
+    paddingHorizontal: 24,
+    paddingBottom: 36,
     alignItems: 'center',
-    marginTop: 60,
-    marginBottom: 40,
   },
-  logoContainer: {
-    marginBottom: 24,
-  },
+
+  /** โลโก้ */
   logo: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 300,
+    height: 150,
+    marginTop: 12,
+    alignSelf: 'center',
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  subtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    opacity: 0.7,
-    lineHeight: 24,
-  },
-  featuresContainer: {
-    marginBottom: 40,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 24,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  featureIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  featureContent: {
-    flex: 1,
-  },
-  featureTitle: {
-    fontSize: 18,
-    marginBottom: 8,
-  },
-  featureDescription: {
-    fontSize: 14,
-    opacity: 0.7,
-    lineHeight: 20,
-  },
-  actionsContainer: {
-    marginBottom: 40,
-  },
-  primaryButton: {
-    backgroundColor: '#2196F3',
-    borderRadius: 16,
-    height: 56,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+
+  /** ภาพประกอบ */
+  hero: {
+    width: '86%',
+    height: 160,
+    marginTop: 12,
     marginBottom: 16,
   },
-  primaryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginRight: 8,
+
+  /** ตัวอักษร */
+  title: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: COLORS.text,
+    textAlign: 'center',
+    marginTop: 12,
+    marginBottom: 10,
   },
-  secondaryButton: {
-    backgroundColor: 'white',
-    borderRadius: 16,
+  subtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#7E7E7E',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+
+  /** ปุ่ม */
+  actions: {
+    width: '100%',
+    marginTop: 8,
+    gap: 14,
+  },
+  primaryBtn: {
     height: 56,
+    borderRadius: 14,
+    backgroundColor: COLORS.blueFill,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    // shadow เบา ๆ ให้ฟีลยกนิดๆ เหมือนในภาพ
+    shadowColor: '#000',
+    shadowOpacity: Platform.OS === 'ios' ? 0.06 : 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  primaryBtnText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.text, // ตัวอักษรสีเข้มบนพื้นฟ้าอ่อน (ตามภาพ)
+  },
+
+  secondaryBtn: {
+    height: 56,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  secondaryButtonText: {
-    color: '#2196F3',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  footer: {
+    borderColor: COLORS.border,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 16,
   },
-  footerText: {
-    fontSize: 12,
-    textAlign: 'center',
-    opacity: 0.6,
-    lineHeight: 18,
-  },
-  linkText: {
-    color: '#2196F3',
-    textDecorationLine: 'underline',
+  secondaryBtnText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.text,
   },
 });

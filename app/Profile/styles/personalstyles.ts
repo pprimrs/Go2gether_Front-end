@@ -76,4 +76,22 @@ export const styles = StyleSheet.create({
     fontWeight: "800",
     color: COLORS.saveText,
   },
+
+  // เพิ่มใน personalstyles.ts ด้านล่าง
+  signOutBtn: {
+    alignSelf: "center",
+    marginTop: 14,
+    borderRadius: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    borderWidth: 1,
+    borderColor: "#F2D8D8",
+    backgroundColor: "#FFFFFF",
+},
+  signOutText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#C62828",
+},
+
 });

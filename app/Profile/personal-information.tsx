@@ -1,3 +1,4 @@
+// app/Profile/personal-information.tsx
 import React, { useState } from "react";
 import {
   View,
@@ -10,7 +11,9 @@ import {
   Alert,
 } from "react-native";
 import { Image } from "expo-image";
-import { styles } from "./styles/personalstyles"; // ⬅️ ดึงสไตล์จากไฟล์แยก
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
+import { styles } from "./styles/personalstyles";
 
 export default function PersonalInformationScreen() {
   const [form, setForm] = useState({
@@ -22,8 +25,11 @@ export default function PersonalInformationScreen() {
   });
   const [saving, setSaving] = useState(false);
 
+  // ✅ state สำหรับปุ่ม Sign out
+  const [signingOut, setSigningOut] = useState(false);
+
   const onChange = (k: keyof typeof form, v: string) =>
-    setForm(prev => ({ ...prev, [k]: v }));
+    setForm((prev) => ({ ...prev, [k]: v }));
 
   const onSave = async () => {
     if (!form.name.trim()) {
@@ -32,21 +38,51 @@ export default function PersonalInformationScreen() {
     }
     setSaving(true);
     try {
-      // TODO: เชื่อม API บันทึกจริง
+      // TODO: call API save
       Alert.alert("Saved", "Your personal information has been saved.");
-    } catch (e: any) {
+    } catch (e) {
       Alert.alert("Error", "Could not save, please try again.");
     } finally {
       setSaving(false);
     }
   };
 
+  // ✅ ฟังก์ชัน Sign out
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      // ลบ token / user data ที่เคยเก็บไว้
+      await Promise.all([
+        AsyncStorage.removeItem("TOKEN"),
+        AsyncStorage.removeItem("USER_DATA"),
+      ]);
+
+      // ถ้าหน้า Welcome อยู่ที่ app/index.tsx ให้ใช้ "/"
+      // ถ้าอยู่ที่ app/welcome.tsx ให้เปลี่ยนเป็น "/welcome"
+      const WELCOME_PATH = "/Auth/welcome"; // ← แก้เป็น "/welcome" ถ้าคุณวางไฟล์ไว้ชื่อนั้น
+
+      // บางเคส iOS/Expo ชอบไม่ยอมเปลี่ยนหน้าทันที—หน่วง 1 tick
+      router.replace(WELCOME_PATH);
+      setTimeout(() => router.replace(WELCOME_PATH), 0);
+    } catch (e) {
+      Alert.alert("Error", "Sign out failed, please try again.");
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.select({ ios: "padding" })}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.select({ ios: "padding" })}
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* โลโก้ */}
         <Image
-          // ปรับ path ให้ตรงกับโปรเจกต์จริง
           source={require("../../assets/images/logo.png")}
           style={styles.logo}
           contentFit="contain"
@@ -57,7 +93,6 @@ export default function PersonalInformationScreen() {
 
         {/* การ์ดฟอร์ม */}
         <View style={styles.card}>
-          {/* Name */}
           <View style={styles.item}>
             <Text style={styles.label}>Name</Text>
             <TextInput
@@ -65,13 +100,12 @@ export default function PersonalInformationScreen() {
               placeholder="Fullname or Nickname"
               placeholderTextColor="#B9B9B9"
               value={form.name}
-              onChangeText={v => onChange("name", v)}
+              onChangeText={(v) => onChange("name", v)}
               returnKeyType="next"
             />
           </View>
           <View style={styles.divider} />
 
-          {/* Food Allergies */}
           <View style={styles.item}>
             <Text style={styles.label}>Food Allergies</Text>
             <TextInput
@@ -79,13 +113,12 @@ export default function PersonalInformationScreen() {
               placeholder="Food Name"
               placeholderTextColor="#B9B9B9"
               value={form.foodAllergies}
-              onChangeText={v => onChange("foodAllergies", v)}
+              onChangeText={(v) => onChange("foodAllergies", v)}
               returnKeyType="next"
             />
           </View>
           <View style={styles.divider} />
 
-          {/* Allergic Drugs */}
           <View style={styles.item}>
             <Text style={styles.label}>Allergic Drugs</Text>
             <TextInput
@@ -93,13 +126,12 @@ export default function PersonalInformationScreen() {
               placeholder="Drugs Name"
               placeholderTextColor="#B9B9B9"
               value={form.allergicDrugs}
-              onChangeText={v => onChange("allergicDrugs", v)}
+              onChangeText={(v) => onChange("allergicDrugs", v)}
               returnKeyType="next"
             />
           </View>
           <View style={styles.divider} />
 
-          {/* Chronic Disease */}
           <View style={styles.item}>
             <Text style={styles.label}>Chronic Disease</Text>
             <TextInput
@@ -107,13 +139,12 @@ export default function PersonalInformationScreen() {
               placeholder="Medical Condition"
               placeholderTextColor="#B9B9B9"
               value={form.chronicDisease}
-              onChangeText={v => onChange("chronicDisease", v)}
+              onChangeText={(v) => onChange("chronicDisease", v)}
               returnKeyType="next"
             />
           </View>
           <View style={styles.divider} />
 
-          {/* Emergency Call */}
           <View style={styles.item}>
             <Text style={styles.label}>Emergency Call</Text>
             <TextInput
@@ -121,7 +152,7 @@ export default function PersonalInformationScreen() {
               placeholder="(+66)"
               placeholderTextColor="#B9B9B9"
               value={form.emergencyCall}
-              onChangeText={v => onChange("emergencyCall", v)}
+              onChangeText={(v) => onChange("emergencyCall", v)}
               keyboardType="phone-pad"
               returnKeyType="done"
             />
@@ -140,6 +171,22 @@ export default function PersonalInformationScreen() {
           accessibilityLabel="Save personal information"
         >
           <Text style={styles.saveText}>{saving ? "Saving..." : "Save"}</Text>
+        </Pressable>
+
+        {/* ปุ่ม Sign out */}
+        <Pressable
+          onPress={handleSignOut}
+          disabled={signingOut}
+          style={({ pressed }) => [
+            styles.signOutBtn,
+            (signingOut || pressed) && { opacity: 0.75 },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Sign out and go to Welcome"
+        >
+          <Text style={styles.signOutText}>
+            {signingOut ? "Signing out..." : "Sign out"}
+          </Text>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
