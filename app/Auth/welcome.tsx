@@ -1,7 +1,15 @@
-// app/index.tsx  ← หน้าแรก (Welcome)
-import { router } from 'expo-router';
+// app/Welcome/index.tsx  (เปลี่ยนพาธไฟล์ตามโปรเจ็กต์จริง)
+import { router, Link } from 'expo-router';
 import React from 'react';
-import { ScrollView, StyleSheet, View, Text, TouchableOpacity, Platform, Image } from 'react-native';
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
+import { Image } from 'expo-image';
 
 export default function WelcomeScreen() {
   const onSignIn = () => router.replace('/Auth/login');
@@ -18,17 +26,18 @@ export default function WelcomeScreen() {
       <Image
         source={require('../../assets/images/logo.png')}
         style={styles.logo}
-        resizeMode="contain"
+        contentFit="contain"
       />
 
       {/* ภาพประกอบ */}
       <Image
+        // ใช้รูปที่คุณมี เช่น home-page.png
         source={require('../../assets/images/home-page.png')}
         style={styles.hero}
-        resizeMode="contain"
+        contentFit="contain"
       />
 
-      {/* ข้อความหัว/คำอธิบาย */}
+      {/* หัวข้อ/คำอธิบาย */}
       <Text style={styles.title}>Plan and Go2gether</Text>
       <Text style={styles.subtitle}>
         The easiest way to turn{'\n'}
@@ -39,13 +48,13 @@ export default function WelcomeScreen() {
         Plan confidently and Go2gether
       </Text>
 
-      {/* ปุ่ม */}
+      {/* ปุ่มการกระทำ */}
       <View style={styles.actions}>
-        <TouchableOpacity onPress={onSignIn} style={styles.primaryBtn} activeOpacity={0.85}>
+        <TouchableOpacity onPress={onSignIn} style={styles.primaryBtn} activeOpacity={0.8}>
           <Text style={styles.primaryBtnText}>Sign in</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={onSignUp} style={styles.secondaryBtn} activeOpacity={0.9}>
+        <TouchableOpacity onPress={onSignUp} style={styles.secondaryBtn} activeOpacity={0.85}>
           <Text style={styles.secondaryBtnText}>Sign up</Text>
         </TouchableOpacity>
       </View>
@@ -53,13 +62,14 @@ export default function WelcomeScreen() {
   );
 }
 
-/* ===== Styles ===== */
+/* ===== Styles (ให้โทนและสัดส่วนเหมือนภาพ) ===== */
 const COLORS = {
   bg: '#FFFFFF',
   text: '#111111',
-  subtitle: '#7E7E7E',
-  blueFill: '#BCD6E7',   // ปุ่มฟ้าอ่อน
-  border: '#EAEAEA',     // เส้นขอบปุ่มขาว
+  muted: '#7C7C7C',
+  blueFill: '#BCD6E7', // ฟ้าพาสเทลของปุ่ม Sign in
+  blueText: '#0B2A3A',
+  border: '#EAEAEA',
 };
 
 const styles = StyleSheet.create({
@@ -74,24 +84,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // โลโก้
+  /** โลโก้ */
   logo: {
-    width: 220,
-    height: 80,
+    width: 300,
+    height: 150,
     marginTop: 12,
     alignSelf: 'center',
   },
 
-  // ภาพประกอบ
+  /** ภาพประกอบ */
   hero: {
     width: '86%',
     height: 160,
     marginTop: 12,
     marginBottom: 16,
-    alignSelf: 'center',
   },
 
-  // ข้อความ
+  /** ตัวอักษร */
   title: {
     fontSize: 24,
     fontWeight: '800',
@@ -103,12 +112,12 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     lineHeight: 20,
-    color: COLORS.subtitle,
+    color: '#7E7E7E',
     textAlign: 'center',
     marginBottom: 24,
   },
 
-  // ปุ่ม
+  /** ปุ่ม */
   actions: {
     width: '100%',
     marginTop: 8,
@@ -121,6 +130,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 16,
+    // shadow เบา ๆ ให้ฟีลยกนิดๆ เหมือนในภาพ
     shadowColor: '#000',
     shadowOpacity: Platform.OS === 'ios' ? 0.06 : 0.12,
     shadowRadius: 8,
@@ -130,7 +140,7 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     fontSize: 18,
     fontWeight: '800',
-    color: COLORS.text, // ตัวอักษรสีเข้มบนพื้นฟ้า
+    color: COLORS.text, // ตัวอักษรสีเข้มบนพื้นฟ้าอ่อน (ตามภาพ)
   },
 
   secondaryBtn: {

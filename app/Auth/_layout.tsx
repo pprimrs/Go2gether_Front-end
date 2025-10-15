@@ -1,11 +1,16 @@
+// app/_layout.tsx
+import React from "react";
 import { Stack } from "expo-router";
+// เลือกแบบใดแบบหนึ่งให้ตรงกับไฟล์ด้านบน (แนะนำ default)
+import AuthProvider from "../../src/store/authStore"; // ✅ default import ที่ตรงกับ default export
 
-export default function AuthLayout() {
+export default function RootLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Auth" />
-      <Stack.Screen name="signin" />
-      <Stack.Screen name="signup" />
-    </Stack>
+    <AuthProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </AuthProvider>
   );
 }
+
+
+

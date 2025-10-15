@@ -187,15 +187,15 @@ class AuthService {
   /**
    * Get Google OAuth URL
    */
-  async getGoogleAuthUrl(): Promise<string> {
+  async getGoogleAuthUrl(): Promise<{ auth_url: string; state: string }> {
     try {
       logger.info('Getting Google OAuth URL');
       
-      const response = await client.get<{ url: string }>(
+      const response = await client.get<{ auth_url: string; state: string }>(
         this.endpoints.GOOGLE_LOGIN
       );
       
-      return response.data.url;
+      return response.data;
     } catch (error) {
       logger.error('Failed to get Google OAuth URL', error);
       throw error;

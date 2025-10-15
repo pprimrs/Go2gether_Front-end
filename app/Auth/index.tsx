@@ -1,8 +1,8 @@
 // app/Auth/index.tsx
-import React from "react";
-import { View, Text, Pressable, Platform } from "react-native";
 import { Image } from "expo-image";
 import { router } from "expo-router";
+import React from "react";
+import { Pressable, Text, View } from "react-native";
 import { styles } from "./styles/homestyles"; // ✅ import style ที่แยกไว้
 
 export default function HomeScreen() {
