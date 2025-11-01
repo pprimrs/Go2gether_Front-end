@@ -15,31 +15,26 @@ import {
 import { styles } from './styles/registerstyles';
 
 export default function RegisterScreen() {
-  // form state (คง logic เดิม)
+  // ✅ ไม่มี username / displayName แล้ว
   const [formData, setFormData] = useState({
-    username: '',
     email: '',
     password: '',
     confirmPassword: '',
-    displayName: '',
   });
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // error state รายช่อง
-  const [errors, setErrors] = useState<Partial<Record<keyof typeof formData, string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<'email' | 'password' | 'confirmPassword', string>>>({});
 
-  const handleInputChange = (field: keyof typeof formData, value: string) => {
+  const handleInputChange = (field: 'email' | 'password' | 'confirmPassword', value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: undefined }));
   };
 
-  const validateField = (field: keyof typeof formData, value: string) => {
+  const validateField = (field: 'email' | 'password' | 'confirmPassword', value: string) => {
     let msg = '';
-    if (field === 'username') {
-      if (!value.trim()) msg = 'Username is required';
-    }
     if (field === 'email') {
       if (!value.trim()) msg = 'Email is required';
       else if (!value.includes('@')) msg = 'Please enter a valid email';
@@ -58,7 +53,6 @@ export default function RegisterScreen() {
 
   const validateForm = () => {
     const next: typeof errors = {};
-    if (!formData.username.trim()) next.username = 'Username is required';
     if (!formData.email.trim()) next.email = 'Email is required';
     else if (!formData.email.includes('@')) next.email = 'Please enter a valid email';
     if (!formData.password) next.password = 'Password is required';
@@ -79,10 +73,8 @@ export default function RegisterScreen() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
-          display_name: formData.displayName || formData.username,
+          email: formData.email.trim(),
+          password: formData.password.trim(),
         }),
       });
 
@@ -109,7 +101,6 @@ export default function RegisterScreen() {
 
   const canSubmit = useMemo(
     () =>
-      !!formData.username.trim() &&
       !!formData.email.trim() &&
       !!formData.password &&
       !!formData.confirmPassword,
@@ -139,22 +130,6 @@ export default function RegisterScreen() {
         {/* Form */}
         <View style={styles.bottomSheet}>
           <ScrollView contentContainerStyle={styles.sheetContent} keyboardShouldPersistTaps="handled">
-            {/* Username */}
-            <View style={[styles.inputWrap, errors.username && styles.inputWrapError]}>
-              <Ionicons name="person-outline" size={18} color="#111" />
-              <TextInput
-                style={styles.input}
-                placeholder="Your name"
-                value={formData.username}
-                onChangeText={v => handleInputChange('username', v)}
-                onBlur={() => validateField('username', formData.username)}
-                autoCapitalize="words"
-                autoCorrect={false}
-                returnKeyType="next"
-              />
-            </View>
-            {errors.username ? <Text style={styles.errorText}>{errors.username}</Text> : null}
-
             {/* Email */}
             <View style={[styles.inputWrap, errors.email && styles.inputWrapError]}>
               <Ionicons name="mail-outline" size={18} color="#111" />

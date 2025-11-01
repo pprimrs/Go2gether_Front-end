@@ -189,6 +189,11 @@ export default function LoginScreen() {
             </View>
             {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
 
+            {/* ✅ Forgot Password link (เพิ่มใหม่) */}
+            <Pressable onPress={() => router.push('/Auth/forgot-password')}>
+              <Text style={styles.forgot}>Forgot Password?</Text>
+            </Pressable>
+
             {/* Global error (เช่น wrong password / network) */}
             {formError ? <Text style={styles.formError}>{formError}</Text> : null}
 

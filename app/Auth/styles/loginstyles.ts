@@ -89,7 +89,14 @@ export const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  forgot: { fontSize: 12, color: '#746E6E', marginTop: 8, alignSelf: 'stretch', textAlign: 'left', marginHorizontal: 34 },
+  /* ✅ ใช้เป็นลิงก์ Forgot Password ใต้ช่องรหัสผ่าน */
+  forgot: {
+    fontSize: 13,
+    color: '#2f6fa0',
+    marginTop: 6,
+    marginLeft: '8%',
+    fontWeight: '500',
+  },
 
   btn: {
     width: '85%',
