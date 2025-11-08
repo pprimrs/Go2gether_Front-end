@@ -15,7 +15,6 @@ import {
 import { styles } from './styles/registerstyles';
 
 export default function RegisterScreen() {
-  // ✅ ไม่มี username / displayName แล้ว
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -143,6 +142,10 @@ export default function RegisterScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="next"
+                // 🔒 ลดออโตฟิลล์แบบเหมาะสมกับอีเมล
+                autoComplete="email"
+                textContentType="emailAddress"
+                importantForAutofill="yes"
               />
             </View>
             {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
@@ -158,6 +161,10 @@ export default function RegisterScreen() {
                 onBlur={() => validateField('password', formData.password)}
                 secureTextEntry={!showPassword}
                 returnKeyType="next"
+                // 🔒 สมัครสมาชิก: ใช้ 'new password' → iOS เลิกทาเหลือง/เขียว และเสนอ Suggest Strong Password แทน
+                autoComplete="password-new"
+                textContentType="newPassword"
+                importantForAutofill="no"   // กัน Android เติมเอง
               />
               <TouchableOpacity onPress={() => setShowPassword(s => !s)} hitSlop={10} style={styles.smallRow}>
                 <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={18} color="#111" />
@@ -176,6 +183,10 @@ export default function RegisterScreen() {
                 onBlur={() => validateField('confirmPassword', formData.confirmPassword)}
                 secureTextEntry={!showConfirmPassword}
                 returnKeyType="done"
+                // 🔒 ปิด AutoFill/Highlight สำหรับช่องยืนยัน
+                autoComplete="off"
+                textContentType="none"
+                importantForAutofill="no"
               />
               <TouchableOpacity onPress={() => setShowConfirmPassword(s => !s)} hitSlop={10} style={styles.smallRow}>
                 <Ionicons name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'} size={18} color="#111" />

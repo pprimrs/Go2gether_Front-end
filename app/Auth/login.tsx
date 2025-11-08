@@ -3,7 +3,6 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -13,18 +12,21 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '../../src/api/services/auth.service';
 import { styles } from './styles/loginstyles';
+
+// 👉 ถ้ารันบน Android Emulator ให้ใช้ 10.0.2.2
+// const BASE_URL = 'http://10.0.2.2:8080';
+const BASE_URL = 'http://localhost:8080';
 
 type Field = 'email' | 'password';
 
 export default function LoginScreen() {
-  // form state (เหมือนเดิม)
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // error state รายช่อง + error รวม (เช่น invalid credentials)
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -56,13 +58,17 @@ export default function LoginScreen() {
     return Object.keys(next).length === 0;
   };
 
+  // ✅ Login → save token → GET /api/profile
+  // - 200: save profile to storage → go Home
+  // - 404: go to /Profile/personal-create
   const handleLogin = async () => {
     if (!validateForm()) return;
     setLoading(true);
     setFormError(null);
 
     try {
-      const response = await fetch('http://localhost:8080/api/auth/login', {
+      // 1) Login
+      const response = await fetch(`${BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email, password: formData.password }),
@@ -71,11 +77,7 @@ export default function LoginScreen() {
       let data: any = {};
       try { data = await response.json(); } catch {}
 
-      if (response.ok) {
-        router.replace('/Profile/personal-information');
-        setTimeout(() => router.replace('/Profile/personal-information'), 0);
-      } else {
-        // แมพสถานะทั่วไปเป็นข้อความบนหน้า (ไม่ใช้ Alert)
+      if (!response.ok) {
         if (response.status === 401) {
           setFormError('Incorrect email or password.');
         } else if (response.status === 404) {
@@ -85,7 +87,59 @@ export default function LoginScreen() {
         } else {
           setFormError(data?.message || 'Login failed. Please try again.');
         }
+        return;
       }
+
+      // 2) Save token + user/email
+      const token = data?.token || data?.accessToken || data?.data?.token;
+      const emailFromApi = data?.user?.email || data?.email || formData.email;
+      if (!token) {
+        setFormError('Missing authentication token.');
+        return;
+      }
+      await AsyncStorage.setItem('TOKEN', token);
+      if (emailFromApi) await AsyncStorage.setItem('USER_EMAIL', String(emailFromApi));
+      if (data?.user) await AsyncStorage.setItem('USER_DATA', JSON.stringify(data.user));
+
+      // 3) Load profile to decide where to go
+      const profRes = await fetch(`${BASE_URL}/api/profile`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (profRes.status === 401) {
+        await AsyncStorage.multiRemove(['USER_NAME','USER_EMAIL','USER_DATA','TOKEN','PROFILE_EXISTS']);
+        setFormError('Session expired. Please sign in again.');
+        router.replace('/Auth/welcome');
+        return;
+      }
+
+      if (profRes.status === 404) {
+        // ไม่มีโปรไฟล์ → ไปสร้าง
+        await AsyncStorage.setItem('PROFILE_EXISTS', 'false');
+        router.replace('/Profile/personal-create');
+        return;
+      }
+
+      let profJson: any = {};
+      try { profJson = await profRes.json(); } catch {}
+
+      if (!profRes.ok) {
+        setFormError(profJson?.message || `Failed to load profile (HTTP ${profRes.status}).`);
+        return;
+      }
+
+      // ✅ 200 → เก็บข้อมูลแล้วไป Home
+      const user = profJson?.user || profJson;
+      await AsyncStorage.setItem('PROFILE_EXISTS', 'true');
+      await AsyncStorage.setItem('USER_DATA', JSON.stringify(user));
+      if (user?.display_name) await AsyncStorage.setItem('USER_NAME', String(user.display_name));
+      if (user?.email) await AsyncStorage.setItem('USER_EMAIL', String(user.email));
+
+      router.replace('/Mainapp/homepage');
     } catch {
       setFormError('Network error. Please check your connection.');
     } finally {
@@ -96,8 +150,8 @@ export default function LoginScreen() {
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
-      const res = await authService.getGoogleAuthUrl(); // ควรคืน { auth_url: string }
-      const url = (res as any).auth_url ?? (res as any).url; // เผื่อ service คืนชื่อ key ไม่เหมือนกัน
+      const res = await authService.getGoogleAuthUrl();
+      const url = (res as any).auth_url ?? (res as any).url;
       if (!url) {
         setFormError('Could not get Google login URL.');
         return;
@@ -189,12 +243,12 @@ export default function LoginScreen() {
             </View>
             {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
 
-            {/* ✅ Forgot Password link (เพิ่มใหม่) */}
+            {/* Forgot */}
             <Pressable onPress={() => router.push('/Auth/forgot-password')}>
               <Text style={styles.forgot}>Forgot Password?</Text>
             </Pressable>
 
-            {/* Global error (เช่น wrong password / network) */}
+            {/* Form error */}
             {formError ? <Text style={styles.formError}>{formError}</Text> : null}
 
             {/* Submit */}
