@@ -1,3 +1,4 @@
+// app/Profile/styles/personalupdatestyles.ts
 import { StyleSheet } from "react-native";
 
 const COLORS = {
@@ -6,9 +7,13 @@ const COLORS = {
   muted: "#7C7C7C",
   card: "#FFFFFF",
   border: "#ECECEC",
-  shadow: "rgba(0,0,0,0.06)",
   saveBg: "#E9E9E9",
   saveText: "#111111",
+  saveBgActive: "#9ACBE2",
+  saveTextActive: "#0B2A3A",
+  saveBgDisabled: "#F1F4F6",
+  saveTextDisabled: "#9AA7B0",
+  error: "#D32F2F",
 };
 
 export const styles = StyleSheet.create({
@@ -45,9 +50,7 @@ export const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 2,
   },
-  item: {
-    paddingVertical: 14,
-  },
+  item: { paddingVertical: 14 },
   label: {
     fontSize: 16,
     fontWeight: "700",
@@ -59,25 +62,31 @@ export const styles = StyleSheet.create({
     color: COLORS.text,
     paddingVertical: 8,
   },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.border,
+  errorText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: COLORS.error,
+    fontWeight: "600",
   },
+  divider: { height: 1, backgroundColor: COLORS.border },
+
   saveBtn: {
     alignSelf: "center",
     marginTop: 28,
-    backgroundColor: COLORS.saveBg,
     borderRadius: 24,
     paddingVertical: 14,
     paddingHorizontal: 36,
   },
-  saveText: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: COLORS.saveText,
+  saveBtnActive: {
+    backgroundColor: COLORS.saveBgActive,
   },
+  saveBtnDisabled: {
+    backgroundColor: COLORS.saveBgDisabled,
+  },
+  saveText: { fontSize: 18, fontWeight: "800" },
+  saveTextActive: { color: COLORS.saveTextActive },
+  saveTextDisabled: { color: COLORS.saveTextDisabled },
 
-  // เพิ่มใน personalstyles.ts ด้านล่าง
   signOutBtn: {
     alignSelf: "center",
     marginTop: 14,
@@ -87,11 +96,10 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#F2D8D8",
     backgroundColor: "#FFFFFF",
-},
+  },
   signOutText: {
     fontSize: 16,
     fontWeight: "700",
     color: "#C62828",
-},
-
+  },
 });
