@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
@@ -12,13 +13,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '../../src/api/services/auth.service';
 import { styles } from './styles/loginstyles';
 
 // 👉 ถ้ารันบน Android Emulator ให้ใช้ 10.0.2.2
 // const BASE_URL = 'http://10.0.2.2:8080';
-const BASE_URL = 'http://localhost:8080';
+const BASE_URL = 'https://undeclamatory-precollegiate-felicitas.ngrok-free.dev';
 
 type Field = 'email' | 'password';
 

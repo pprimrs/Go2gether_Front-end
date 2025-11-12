@@ -1,11 +1,16 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Image } from "expo-image";
+import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  View, Text, TextInput, KeyboardAvoidingView, Platform,
-  ScrollView, Pressable, Alert, ActivityIndicator
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView, Platform,
+    Pressable,
+    ScrollView,
+    Text, TextInput,
+    View
 } from "react-native";
-import { Image } from "expo-image";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
 import { styles } from "./styles/personalupdatestyles";
 
 type FormState = {
@@ -45,7 +50,7 @@ export default function PersonalUpdateScreen() {
           }
           return;
         }
-        const res = await fetch("http://localhost:8080/api/profile", {
+        const res = await fetch("https://undeclamatory-precollegiate-felicitas.ngrok-free.dev/api/profile", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -149,7 +154,7 @@ export default function PersonalUpdateScreen() {
         // โดยทั่วไปฝั่ง update ไม่จำเป็นต้องส่ง ถ้า backend ไม่บังคับ
       };
 
-      const res = await fetch("http://localhost:8080/api/profile", {
+      const res = await fetch("https://undeclamatory-precollegiate-felicitas.ngrok-free.dev/api/profile", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

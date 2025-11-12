@@ -1,20 +1,20 @@
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
-  Text,
-  TextInput,
-  View,
-  Pressable,
-  ScrollView,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
-import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
 import { styles } from './styles/verifystyles';
 
-const VERIFY_URL = 'http://localhost:8080/api/auth/verify-otp';
+const VERIFY_URL = 'https://undeclamatory-precollegiate-felicitas.ngrok-free.dev/api/auth/verify-otp';
 
 export default function VerifyCodeScreen() {
   const insets = useSafeAreaInsets();

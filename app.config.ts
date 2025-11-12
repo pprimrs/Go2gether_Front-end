@@ -10,6 +10,6 @@ export default (): ExpoConfig => ({
     "expo-router"
   ],
   extra: {
-    API_URL: process.env.API_URL ?? "http://localhost:8080",
+    API_URL: process.env.API_URL ?? "https://undeclamatory-precollegiate-felicitas.ngrok-free.dev",
   },
 });

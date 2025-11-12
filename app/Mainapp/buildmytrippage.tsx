@@ -1,7 +1,13 @@
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
-  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -11,195 +17,282 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
-import { router } from "expo-router";
-import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import * as ImagePicker from "expo-image-picker";
 import { styles } from "./styles/buildmytripstyles";
 
-function formatDate(d?: Date) {
-  if (!d) return "";
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
+const BASE_URL = "https://undeclamatory-precollegiate-felicitas.ngrok-free.dev"; // Android Emulator: http://10.0.2.2:8080
+
+/* ---------- Per-user storage helpers ---------- */
+const USER_NS = (email: string) => `USER(${email})`;
+const keyScoped = (email: string, base: string) => `${USER_NS(email)}:${base}`;
+const KEY_TRIP_DRAFTS = (email: string) => keyScoped(email, "TRIP_DRAFTS");
+const KEY_TRIP_COVER_MAP = (email: string) => keyScoped(email, "TRIP_COVER_MAP");
+const KEY_JOINED_TRIPS = (email: string) => keyScoped(email, "JOINED_TRIPS");
+const KEY_ACTIVE_EMAIL = "ACTIVE_EMAIL";
+
+async function fetchWithAuth(path: string, init?: RequestInit) {
+  const token = await AsyncStorage.getItem("TOKEN");
+  const headers: Record<string, string> = {
+    ...(init?.headers as Record<string, string>),
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(path, { ...init, headers });
+  if (res.status === 401) {
+    await AsyncStorage.multiRemove(["USER_NAME", "USER_EMAIL", "USER_DATA", "TOKEN"]);
+    Alert.alert("Session expired", "Please sign in again.");
+    router.replace("/Auth/login");
+    throw new Error("Unauthorized");
+  }
+  return res;
 }
 
-const isEmail = (s: string) =>
-  !!s.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim().toLowerCase());
+async function getActiveEmail(): Promise<string> {
+  try {
+    const res = await fetchWithAuth(`${BASE_URL}/api/auth/profile`);
+    if (res.ok) {
+      const p = await res.json().catch(() => ({}));
+      const email =
+        p?.email ||
+        p?.user?.email ||
+        p?.data?.email ||
+        p?.profile?.email ||
+        (await AsyncStorage.getItem("USER_EMAIL")) ||
+        "";
+      if (email) {
+        await AsyncStorage.setItem("USER_EMAIL", String(email));
+        await AsyncStorage.setItem(KEY_ACTIVE_EMAIL, String(email));
+        return String(email);
+      }
+    }
+  } catch {}
+  const cached = (await AsyncStorage.getItem(KEY_ACTIVE_EMAIL)) || (await AsyncStorage.getItem("USER_EMAIL")) || "anon";
+  return cached;
+}
 
-export default function MyTripPage() {
+async function addJoined(email: string, tripId: string) {
+  const raw = await AsyncStorage.getItem(KEY_JOINED_TRIPS(email));
+  const set = new Set<string>(raw ? JSON.parse(raw) : []);
+  if (!set.has(tripId)) {
+    set.add(tripId);
+    await AsyncStorage.setItem(KEY_JOINED_TRIPS(email), JSON.stringify(Array.from(set)));
+  }
+}
+
+/* ---------- helpers ---------- */
+const toISO = (d: Date) => d.toISOString().slice(0, 10);
+const formatDate = (d?: Date) =>
+  !d ? "" : `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+
+export default function BuildMyTripPage() {
   const [tripName, setTripName] = useState("");
-  const [address, setAddress] = useState("");
-
-  // ---------- Cover image ----------
+  const [destination, setDestination] = useState("");
   const [coverUri, setCoverUri] = useState<string | undefined>(undefined);
 
+  // date range
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [picking, setPicking] = useState<"start" | "end">("start");
+  const [tempDate, setTempDate] = useState<Date>(new Date());
+
+  // budgets
+  const [budget, setBudget] = useState({ food: "", hotel: "", shopping: "", transport: "" });
+  const totalBudget = useMemo(() => {
+    const n = (s: string) => Number(s || 0);
+    return n(budget.food) + n(budget.hotel) + n(budget.shopping) + n(budget.transport);
+  }, [budget]);
+
+  const canPublish = useMemo(
+    () => !!tripName.trim() && !!destination.trim() && !!startDate && !!endDate && endDate >= startDate,
+    [tripName, destination, startDate, endDate]
+  );
+
+  // image picker
   const pickCover = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission required", "Please allow photo library access.");
-      return;
-    }
+    if (status !== "granted")
+      return Alert.alert("Permission required", "Please allow photo access.");
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 0.9,
       aspect: [4, 4],
     });
-    if (!res.canceled && res.assets?.length) {
-      setCoverUri(res.assets[0].uri);
-    }
+    if (!res.canceled && res.assets?.length) setCoverUri(res.assets[0].uri);
   };
 
-  // ---------- Date range ----------
-  const [startDate, setStartDate] = useState<Date | undefined>();
-  const [endDate, setEndDate] = useState<Date | undefined>();
-
-  // Modal bottom sheet for DateTimePicker
-  const [pickerVisible, setPickerVisible] = useState(false);
-  const [picking, setPicking] = useState<"start" | "end">("start");
-  const [tempDate, setTempDate] = useState<Date>(new Date());
-
-  // ---------- Friends ----------
-  const [friendEmail, setFriendEmail] = useState("");
-  const [friends, setFriends] = useState<string[]>([]);
-
-  const addFriend = () => {
-    const email = friendEmail.trim().toLowerCase();
-    if (!isEmail(email)) {
-      Alert.alert("Invalid email", "Please enter a valid email.");
-      return;
-    }
-    if (friends.includes(email)) {
-      Alert.alert("Duplicate", "This email has already been added.");
-      return;
-    }
-    setFriends((prev) => [...prev, email]);
-    setFriendEmail("");
-    Keyboard.dismiss();
-  };
-  const removeFriend = (email: string) =>
-    setFriends((prev) => prev.filter((e) => e !== email));
-
-  // ---------- Budget ----------
-  const [budget, setBudget] = useState({
-    food: "",
-    hotel: "",
-    shopping: "",
-    transport: "",
-  });
-
-  const canPublish = useMemo(
-    () => !!tripName.trim() && !!startDate && !!endDate && endDate >= startDate,
-    [tripName, startDate, endDate]
-  );
-
-  // ---------- Date pickers ----------
+  // date pickers
   const openStartPicker = () => {
-    Keyboard.dismiss();
     setPicking("start");
     setTempDate(startDate || new Date());
     setPickerVisible(true);
   };
   const openEndPicker = () => {
-    if (!startDate) {
-      Alert.alert("Select start date first");
-      return;
-    }
-    Keyboard.dismiss();
+    if (!startDate) return Alert.alert("Select start date first");
     setPicking("end");
     setTempDate(endDate || startDate || new Date());
     setPickerVisible(true);
   };
-
+  const onAndroidChange = (e: DateTimePickerEvent, d?: Date) => {
+    if (e.type !== "dismissed" && d) setTempDate(d);
+  };
+  const onIOSChange = (_: any, d?: Date) => {
+    if (d) setTempDate(d);
+  };
   const confirmPick = () => {
     if (picking === "start") {
       setStartDate(tempDate);
       if (endDate && endDate < tempDate) setEndDate(undefined);
     } else {
-      if (startDate && tempDate < startDate) {
-        Alert.alert("Invalid range", "End date must be after the start date.");
-        return;
-      }
+      if (startDate && tempDate < startDate)
+        return Alert.alert("Invalid range", "End date must be after start date.");
       setEndDate(tempDate);
     }
     setPickerVisible(false);
   };
 
-  const onAndroidChange = (e: DateTimePickerEvent, d?: Date) => {
-    if (e.type === "dismissed") return;
-    if (d) setTempDate(d);
-  };
-  const onIOSChange = (_: any, d?: Date) => {
-    if (d) setTempDate(d);
+  const [submitting, setSubmitting] = useState(false);
+
+  // DRAFT (LOCAL ONLY) — per-user key
+  const onDraft = async () => {
+    if (!tripName.trim())
+      return Alert.alert("Trip name required", "Please enter your trip name.");
+
+    const draft = {
+      id: `draft_${Date.now()}`,
+      title: tripName.trim(),
+      destination: destination.trim(),
+      startDate: startDate ? toISO(startDate) : "",
+      endDate: endDate ? toISO(endDate) : "",
+      total_budget: Number.isFinite(totalBudget) ? totalBudget : 0,
+      coverUri, // camelCase
+      created_at: new Date().toISOString(),
+      status: "draft" as const,
+    };
+
+    try {
+      const email = await getActiveEmail();
+      const raw = await AsyncStorage.getItem(KEY_TRIP_DRAFTS(email));
+      const list = raw ? JSON.parse(raw) : [];
+      list.unshift(draft);
+      await AsyncStorage.setItem(KEY_TRIP_DRAFTS(email), JSON.stringify(list));
+      Alert.alert("Saved to Draft", "Your trip draft has been saved locally.");
+      router.replace("/Mainapp/mytrippage");
+    } catch {
+      Alert.alert("Error", "Could not save draft, please try again.");
+    }
   };
 
-  const onDraft = () =>
-    Alert.alert("Saved to Draft", "Your trip has been saved as a draft.");
-  const onPublish = () => {
-    if (!canPublish) {
-      Alert.alert("Incomplete", "Please fill in trip name and date range.");
-      return;
+  // PUBLISH — เรียก API และบันทึก cover map + JOINED_TRIPS (per-user)
+  const onPublish = async () => {
+    if (!canPublish)
+      return Alert.alert("Incomplete", "Please fill in required fields and date range.");
+    setSubmitting(true);
+    try {
+      const payload = {
+        name: tripName.trim(),
+        destination: destination.trim(),
+        start_date: toISO(startDate!),
+        end_date: toISO(endDate!),
+        currency: "THB",
+        total_budget: Number.isFinite(totalBudget) ? totalBudget : 0,
+        description: "",
+        status: "published",
+      };
+
+      const res = await fetchWithAuth(`${BASE_URL}/api/trips`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      let json: any = {};
+      try { json = await res.json(); } catch {}
+
+      if (!res.ok) {
+        const msg = json?.message || `Create trip failed (HTTP ${res.status}).`;
+        Alert.alert("Error", msg);
+        return;
+      }
+
+      const trip = json?.trip || json;
+      const tripId = trip?.id;
+
+      // per-user cover map + joined set
+      const email = await getActiveEmail();
+
+      if (tripId && coverUri?.trim()) {
+        try {
+          const raw = await AsyncStorage.getItem(KEY_TRIP_COVER_MAP(email));
+          const map = raw ? JSON.parse(raw) : {};
+          map[tripId] = coverUri;
+          await AsyncStorage.setItem(KEY_TRIP_COVER_MAP(email), JSON.stringify(map));
+        } catch {}
+      }
+
+      if (tripId) {
+        await addJoined(email, String(tripId)); // creator เห็นของตัวเอง
+      }
+
+      Alert.alert("Published", "Your trip has been published!");
+      router.replace("/Mainapp/mytrippage");
+    } catch {
+      Alert.alert("Error", "Could not publish trip. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-    Alert.alert("Published", "Your trip has been published!");
-    if (router.canGoBack()) router.back();
-    else router.replace("/Mainapp/homepage");
   };
 
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: "#FFF" }}
-      behavior={Platform.select({ ios: "padding", android: undefined })}
+      behavior={Platform.select({ ios: "padding" })}
     >
       {/* Header */}
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { marginTop: 12 }]}>
         <Pressable
-          onPress={() => {
-            if (router.canGoBack()) router.back();
-            else router.replace("/Mainapp/homepage");
-          }}
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.replace("/Mainapp/mytrippage")
+          }
           hitSlop={10}
           style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
         >
           <Ionicons name="chevron-back" size={24} color="#111" />
         </Pressable>
-
         <Text style={styles.title}>Edit Your Trip</Text>
-
-        <Pressable
-          onPress={() => Alert.alert("Favorite", "Coming soon")}
-          hitSlop={10}
-          style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-        >
-          <Ionicons name="star-outline" size={24} color="#C9C9C9" />
-        </Pressable>
+        <View style={{ width: 24 }} />
       </View>
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.pageContent, { paddingBottom: 260 }]} // ✅ ยืดพอให้เลื่อน
+        contentContainerStyle={[styles.pageContent, { paddingBottom: 260 }]}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        nestedScrollEnabled
-        bounces
-        showsVerticalScrollIndicator
       >
-        {/* Cover image */}
+        {/* Cover area */}
         <View style={styles.coverWrap}>
-          <Image
-            source={
-              coverUri
-                ? { uri: coverUri }
-                : require("../../assets/images/japan.png")
-            }
-            style={styles.coverImg}
-            contentFit="cover"
-          />
+          {coverUri?.trim() ? (
+            <Image source={{ uri: coverUri }} style={styles.coverImg} contentFit="cover" />
+          ) : (
+            <View style={[styles.coverImg, styles.coverPlaceholder]}>
+              <Ionicons name="image-outline" size={28} color="#97A6B1" />
+              <Text style={styles.coverHint}>No picture</Text>
+            </View>
+          )}
+
+          {/* add / change photo */}
           <Pressable style={styles.coverAction} onPress={pickCover}>
-            <Ionicons name="image-outline" size={18} color="#fff" />
+            <Ionicons name="add" size={18} color="#fff" />
           </Pressable>
+
+          {/* quick clear photo */}
+          {coverUri?.trim() && (
+            <Pressable
+              onPress={() => setCoverUri(undefined)}
+              hitSlop={10}
+              style={{ position: "absolute", right: 52, bottom: 12, backgroundColor: "#0008", borderRadius: 12, padding: 6 }}
+            >
+              <Ionicons name="close" size={14} color="#fff" />
+            </Pressable>
+          )}
         </View>
 
         {/* Trip Name */}
@@ -212,13 +305,13 @@ export default function MyTripPage() {
           returnKeyType="next"
         />
 
-        {/* Address */}
-        <Text style={styles.label}>Address</Text>
+        {/* Destination */}
+        <Text style={styles.label}>Destination</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter Your Address"
-          value={address}
-          onChangeText={setAddress}
+          placeholder="City / Country"
+          value={destination}
+          onChangeText={setDestination}
           returnKeyType="next"
         />
 
@@ -258,62 +351,28 @@ export default function MyTripPage() {
           </Pressable>
         </View>
 
-        {/* Add Friends */}
-        <Text style={styles.label}>Add Friends</Text>
-        <View style={styles.addFriendRow}>
-          <TextInput
-            style={[styles.input, { flex: 1, marginBottom: 0 }]}
-            placeholder="Enter Your Friends Email"
-            keyboardType="email-address"
-            value={friendEmail}
-            onChangeText={setFriendEmail}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="done"
-            onSubmitEditing={addFriend}
-          />
-          <Pressable onPress={addFriend} style={styles.addBtn}>
-            <Text style={styles.addBtnText}>Add</Text>
-          </Pressable>
-        </View>
-
-        {friends.length > 0 && (
-          <View style={styles.chipsWrap}>
-            {friends.map((em) => (
-              <View key={em} style={styles.chip}>
-                <Text style={styles.chipText}>{em}</Text>
-                <Pressable onPress={() => removeFriend(em)} hitSlop={10}>
-                  <Ionicons name="close-circle" size={16} color="#97A6B1" />
-                </Pressable>
-              </View>
-            ))}
-          </View>
-        )}
-
         {/* Budget */}
         <Text style={styles.label}>Budget</Text>
-        {["Food", "Hotel", "Shopping", "Transportation"].map((type) => {
-          const key = type.toLowerCase() as keyof typeof budget;
+        {["Food", "Hotel", "Shopping", "Transport"].map((t) => {
+          const k = (t === "Transport" ? "transport" : t.toLowerCase()) as keyof typeof budget;
           const icon =
-            type === "Food"
+            t === "Food"
               ? "cafe-outline"
-              : type === "Hotel"
+              : t === "Hotel"
               ? "bed-outline"
-              : type === "Shopping"
+              : t === "Shopping"
               ? "bag-outline"
               : "bus-outline";
           return (
-            <View key={key} style={styles.budgetRow}>
+            <View key={k} style={styles.budgetRow}>
               <Ionicons name={icon} size={16} color="#B2B2B2" />
-              <Text style={styles.budgetText}>{type}</Text>
+              <Text style={styles.budgetText}>{t}</Text>
               <TextInput
                 style={styles.amountInput}
                 placeholder="0"
                 keyboardType="numeric"
-                value={budget[key]}
-                onChangeText={(v) =>
-                  setBudget((b) => ({ ...b, [key]: v.replace(/[^\d]/g, "") }))
-                }
+                value={budget[k]}
+                onChangeText={(v) => setBudget((b) => ({ ...b, [k]: v.replace(/[^\d]/g, "") }))}
               />
               <Text style={styles.currency}>฿</Text>
             </View>
@@ -324,30 +383,31 @@ export default function MyTripPage() {
 
         {/* Buttons */}
         <View style={styles.bottomButtons}>
-          <Pressable style={styles.btnGhost} onPress={onDraft}>
+          <Pressable style={styles.btnGhost} onPress={onDraft} disabled={submitting}>
             <Text style={styles.btnGhostText}>Draft</Text>
           </Pressable>
 
           <Pressable
-            style={[styles.btnPrimary, !canPublish && styles.btnPrimaryDisabled]}
-            disabled={!canPublish}
+            style={[styles.btnPrimary, (!canPublish || submitting) && styles.btnPrimaryDisabled]}
+            disabled={!canPublish || submitting}
             onPress={onPublish}
           >
-            <Text
-              style={[
-                styles.btnPrimaryText,
-                !canPublish && styles.btnPrimaryTextDisabled,
-              ]}
-            >
-              Publish
-            </Text>
+            {submitting ? (
+              <ActivityIndicator />
+            ) : (
+              <Text
+                style={[styles.btnPrimaryText, !canPublish && styles.btnPrimaryTextDisabled]}
+              >
+                Publish
+              </Text>
+            )}
           </Pressable>
         </View>
 
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      {/* ===== Date Picker Modal ===== */}
+      {/* Date Picker Modal */}
       <Modal
         visible={pickerVisible}
         animationType="slide"
@@ -367,13 +427,12 @@ export default function MyTripPage() {
                 <Text style={styles.modalDone}>Done</Text>
               </Pressable>
             </View>
-
             <DateTimePicker
-              value={tempDate || new Date()}
+              value={tempDate}
               mode="date"
               display={Platform.OS === "ios" ? "inline" : "calendar"}
               onChange={Platform.OS === "ios" ? onIOSChange : onAndroidChange}
-              minimumDate={picking === "end" ? (startDate || new Date()) : new Date()}
+              minimumDate={picking === "end" ? startDate || new Date() : new Date()}
             />
           </View>
         </View>

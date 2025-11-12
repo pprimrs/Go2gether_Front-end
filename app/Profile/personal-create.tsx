@@ -1,11 +1,15 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Image } from "expo-image";
+import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  View, Text, TextInput, KeyboardAvoidingView, Platform,
-  ScrollView, Pressable, Alert
+  Alert,
+  KeyboardAvoidingView, Platform,
+  Pressable,
+  ScrollView,
+  Text, TextInput,
+  View
 } from "react-native";
-import { Image } from "expo-image";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
 import { styles } from "./styles/personalcreatestyles";
 
 type FormState = {
@@ -111,7 +115,7 @@ export default function PersonalCreateScreen() {
         username: await resolveUsername(form.name),
       };
 
-      const res = await fetch("http://localhost:8080/api/profile", {
+      const res = await fetch("https://undeclamatory-precollegiate-felicitas.ngrok-free.dev/api/profile", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
