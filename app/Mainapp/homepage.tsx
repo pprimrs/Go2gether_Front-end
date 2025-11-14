@@ -1,50 +1,205 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, ScrollView, Pressable, Platform } from "react-native";
-import { Image } from "expo-image";
+// app/Mainapp/homepage.tsx
 import { Ionicons } from "@expo/vector-icons";
-import { router, usePathname } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Clipboard from "expo-clipboard";
+import { Image } from "expo-image";
+import { router, useFocusEffect, usePathname } from "expo-router";
+import React, { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { styles } from "./styles/homepagestyles";
 
-type TripItem = { title: string; img: any };
+const BASE_URL = "https://undeclamatory-precollegiate-felicitas.ngrok-free.dev";
 
-const myTrips: TripItem[] = [
-  { title: "Japan gogo", img: require("../../assets/images/japan.png") },
-  { title: "Eat w/kiki", img: require("../../assets/images/korean.png") },
-  { title: "Picnic day", img: require("../../assets/images/japan.png") },
-];
+/* ---------- Types ---------- */
+type ApiTrip = {
+  id: string;
+  name: string;
+  destination: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+};
 
-const favoriteTrips: TripItem[] = [
-  { title: "Ni hao lao gong", img: require("../../assets/images/chinese.png") },
-  { title: "BKK is calling!", img: require("../../assets/images/bkk.png") },
-];
+/* ---------- Per-user namespaced keys ---------- */
+const USER_NS = (email: string) => `USER(${email})`;
+const keyScoped = (email: string, base: string) => `${USER_NS(email)}:${base}`;
+const KEY_TRIP_COVER_MAP = (email: string) => keyScoped(email, "TRIP_COVER_MAP");
+const KEY_HIDDEN_PUBLISHED = (email: string) => keyScoped(email, "HIDDEN_PUBLISHED_IDS");
+const KEY_JOINED_TRIPS = (email: string) => keyScoped(email, "JOINED_TRIPS");
+const KEY_ACTIVE_EMAIL = "ACTIVE_EMAIL";
+const KEY_LAST_INVITE_TOKEN = (email: string) => keyScoped(email, "LAST_INVITE_TOKEN");
+const KEY_OWN_TRIP_IDS = (email: string) => keyScoped(email, "OWN_TRIP_IDS");
 
-// Card
-function TripCard({ item, onPress }: { item: TripItem; onPress?: () => void }) {
+/* ---------- Helpers ---------- */
+async function fetchWithAuth(path: string, init?: RequestInit) {
+  const token = await AsyncStorage.getItem("TOKEN");
+  const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(path, { ...init, headers });
+  if (res.status === 401) {
+    await AsyncStorage.multiRemove(["USER_NAME", "USER_EMAIL", "USER_DATA", "TOKEN"]);
+    Alert.alert("Session expired", "Please sign in again.");
+    router.replace("/Auth/login");
+    throw new Error("Unauthorized");
+  }
+  return res;
+}
+
+async function getActiveEmail(): Promise<string> {
+  try {
+    const res = await fetchWithAuth(`${BASE_URL}/api/auth/profile`);
+    if (res.ok) {
+      const p = await res.json().catch(() => ({}));
+      const email =
+        p?.email ||
+        p?.user?.email ||
+        p?.data?.email ||
+        p?.profile?.email ||
+        (await AsyncStorage.getItem("USER_EMAIL")) ||
+        "";
+      if (email) {
+        await AsyncStorage.setItem("USER_EMAIL", String(email));
+        await AsyncStorage.setItem(KEY_ACTIVE_EMAIL, String(email));
+        return String(email);
+      }
+    }
+  } catch {}
+  const cached =
+    (await AsyncStorage.getItem(KEY_ACTIVE_EMAIL)) ||
+    (await AsyncStorage.getItem("USER_EMAIL")) ||
+    "anon";
+  return cached;
+}
+
+async function readCoverMap(email: string): Promise<Record<string, string>> {
+  try {
+    const raw = await AsyncStorage.getItem(KEY_TRIP_COVER_MAP(email));
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+async function readHidden(email: string): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(KEY_HIDDEN_PUBLISHED(email));
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+async function readJoined(email: string): Promise<Set<string>> {
+  try {
+    const raw = await AsyncStorage.getItem(KEY_JOINED_TRIPS(email));
+    const arr: string[] = raw ? JSON.parse(raw) : [];
+    return new Set(arr);
+  } catch {
+    return new Set();
+  }
+}
+async function writeJoined(email: string, setIds: Set<string>) {
+  const arr = Array.from(setIds);
+  await AsyncStorage.setItem(KEY_JOINED_TRIPS(email), JSON.stringify(arr));
+}
+async function readOwnTripIds(email: string): Promise<Set<string>> {
+  try {
+    const raw = await AsyncStorage.getItem(KEY_OWN_TRIP_IDS(email));
+    const arr: string[] = raw ? JSON.parse(raw) : [];
+    return new Set(arr);
+  } catch {
+    return new Set();
+  }
+}
+
+/* ---------- Normalizer ---------- */
+function isApiTrip(x: any): x is ApiTrip {
+  return (
+    x &&
+    typeof x === "object" &&
+    typeof x.id === "string" &&
+    typeof x.name === "string" &&
+    typeof x.destination === "string"
+  );
+}
+function normalizeTrips(input: any): ApiTrip[] {
+  const arr = (Array.isArray(input?.trips)
+    ? input.trips
+    : Array.isArray(input)
+    ? input
+    : []) as any[];
+  return arr
+    .map((x: any) => ({ ...x, id: String(x?.id ?? "") }))
+    .filter(isApiTrip);
+}
+
+/* ---------- Utils: extract invitation token ---------- */
+function extractInviteToken(input: string): string | undefined {
+  if (!input) return undefined;
+  const s = input.trim();
+  try {
+    const u = new URL(s);
+    const token = u.searchParams.get("token") || undefined;
+    if (token) return token;
+  } catch {
+    // not a URL
+  }
+  if (s.length >= 20) return s; // assume JWT
+  return undefined;
+}
+
+/* ---------- Small card ---------- */
+function TripCard({
+  title,
+  image,
+  onPress,
+}: {
+  title: string;
+  image: any | null;
+  onPress?: () => void;
+}) {
   return (
     <Pressable style={styles.card} onPress={onPress}>
-      <Image source={item.img} style={styles.cardImage} contentFit="cover" />
-      <Text numberOfLines={1} style={styles.cardTitle}>{item.title}</Text>
+      {image ? (
+        <Image source={image} style={styles.cardImage} contentFit="cover" />
+      ) : (
+        <View
+          style={[
+            styles.cardImage,
+            { alignItems: "center", justifyContent: "center", backgroundColor: "#E9EEF3" },
+          ]}
+        >
+          <Ionicons name="image-outline" size={18} color="#97A6B1" />
+          <Text style={{ marginTop: 4, fontSize: 11, color: "#97A6B1", fontWeight: "700" }}>
+            No picture
+          </Text>
+        </View>
+      )}
+      <Text numberOfLines={1} style={styles.cardTitle}>
+        {title}
+      </Text>
     </Pressable>
   );
 }
 
-// Bottom Bar
+/* ---------- Bottom Bar ---------- */
 function BottomBar() {
   const pathname = usePathname();
-  const isActive = (key: "home" | "mytrip" | "freeday" | "noti") => {
-    if (key === "home") return pathname?.includes("/Mainapp/homepage");
-    if (key === "mytrip") return pathname?.startsWith("/Trip");
-    if (key === "freeday") return pathname?.includes("/FreeDay");
-    return pathname?.includes("/Notification");
-  };
-
   const items = [
-    { key: "home", label: "Home", icon: "home-outline", to: "/Mainapp/homepage" },
-    { key: "mytrip", label: "My Trip", icon: "location-outline", to: "/Mainapp/mytrippage" }, 
-    { key: "freeday", label: "Free Day", icon: "briefcase-outline", to: "/FreeDay" },
-    { key: "noti", label: "Notification", icon: "mail-open-outline", to: "/Notification" },
+    { key: "/Mainapp/homepage", label: "Home", icon: "home-outline", to: "/Mainapp/homepage" },
+    { key: "/Mainapp/mytrippage", label: "My Trip", icon: "location-outline", to: "/Mainapp/mytrippage" },
+    { key: "/Mainapp/freedaypage", label: "Free Day", icon: "briefcase-outline", to: "/Mainapp/freedaypage" },
+    { key: "/Mainapp/notipage", label: "Notification", icon: "mail-open-outline", to: "/Mainapp/notipage" },
   ] as const;
+
+  const isActive = (k: string) => (pathname ?? "").startsWith(k);
 
   return (
     <View style={styles.bottomBar}>
@@ -67,22 +222,133 @@ function BottomBar() {
   );
 }
 
+/* ---------- Page ---------- */
 export default function HomePage() {
   const [userName, setUserName] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
+  const [published, setPublished] = useState<ApiTrip[]>([]);
+  const [coverMap, setCoverMap] = useState<Record<string, string>>({});
+  const [hidden, setHidden] = useState<string[]>([]);
+  const [ownTripIds, setOwnTripIds] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const loadUserName = async () => {
-      try {
-        const name = await AsyncStorage.getItem("USER_NAME");
-        if (name) setUserName(name);
-      } catch (e) {
-        console.warn("Cannot load name:", e);
-      }
-    };
-    loadUserName();
+  // Modal: Join via Link
+  const [joinOpen, setJoinOpen] = useState(false);
+  const [joinInput, setJoinInput] = useState("");
+  const [joining, setJoining] = useState(false);
+
+  const getImage = (id?: string) => {
+    if (id && coverMap[id]) return { uri: coverMap[id] };
+    return null;
+  };
+
+  const loadUserName = useCallback(async () => {
+    try {
+      const name = await AsyncStorage.getItem("USER_NAME");
+      if (name) setUserName(name);
+    } catch {}
   }, []);
 
+  const loadLocalMaps = useCallback(async (currentEmail: string) => {
+    setCoverMap(await readCoverMap(currentEmail));
+    setHidden(await readHidden(currentEmail));
+  }, []);
+
+  const fetchPublished = useCallback(async (currentEmail: string) => {
+    setLoading(true);
+    try {
+      const res = await fetchWithAuth(`${BASE_URL}/api/trips?status=published&limit=100&offset=0`);
+      const js = await res.json().catch(() => ({}));
+      const all: ApiTrip[] = normalizeTrips(js);
+      const joined = await readJoined(currentEmail);
+      const mine = all.filter((t) => joined.has(t.id));
+      setPublished(mine);
+    } catch {
+      setPublished([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        const e = await getActiveEmail();
+        setEmail(e);
+        await loadUserName();
+        await loadLocalMaps(e);
+        const own = await readOwnTripIds(e);
+        setOwnTripIds(Array.from(own));
+        await fetchPublished(e);
+      })();
+    }, [loadUserName, loadLocalMaps, fetchPublished])
+  );
+
   const displayName = userName || "User";
+  const filtered = published.filter((t) => !hidden.includes(t.id));
+  const hasPublished = filtered.length > 0;
+
+  /* ---------- Join via link handlers ---------- */
+  const pasteFromClipboard = async () => {
+    try {
+      const txt = await Clipboard.getStringAsync();
+      if (txt) setJoinInput(txt);
+    } catch {
+      Alert.alert("Clipboard", "Cannot read from clipboard.");
+    }
+  };
+
+  let inFlight = false;
+  const submitJoin = async () => {
+    if (inFlight || joining) return;
+    const token = extractInviteToken(joinInput);
+    if (!token) {
+      Alert.alert("Invalid", "Please paste a valid invite link or token.");
+      return;
+    }
+    if (!email) {
+      Alert.alert("Error", "Please sign in again.");
+      return;
+    }
+
+    inFlight = true;
+    setJoining(true);
+    try {
+      await AsyncStorage.setItem(KEY_LAST_INVITE_TOKEN(email), token);
+
+      const res = await fetchWithAuth(`${BASE_URL}/api/trips/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invitation_token: token }),
+      });
+
+      const rawText = await res.text();
+      let js: any = {};
+      try {
+        js = rawText ? JSON.parse(rawText) : {};
+      } catch {}
+
+      if (!res.ok) {
+        const msg = js?.message || js?.error || rawText || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+
+      const joined = await readJoined(email);
+      const tripIdFromRes: string = js?.trip?.id || js?.id || js?.trip_id || "";
+      if (tripIdFromRes) joined.add(String(tripIdFromRes));
+      await writeJoined(email, joined);
+
+      await fetchPublished(email);
+      setJoinOpen(false);
+      setJoinInput("");
+      Alert.alert("Joined", "You have joined the trip successfully.");
+    } catch (e: any) {
+      Alert.alert("Join failed", e?.message || "Could not join the trip.");
+    } finally {
+      inFlight = false;
+      setJoining(false);
+    }
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -93,21 +359,12 @@ export default function HomePage() {
       >
         {/* Header */}
         <View style={styles.headerRow}>
-          <View style={styles.profileRow}>
+          <View style={[styles.profileRow, { alignItems: "center", gap: 12 }]}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{displayName.charAt(0).toUpperCase()}</Text>
             </View>
-            <View style={{ gap: 6 }}>
+            <View>
               <Text style={styles.profileName}>{displayName}</Text>
-              <Pressable
-                onPress={() => router.push("/Friends/add")}
-                style={({ pressed }) => [styles.pillBtn, pressed && { opacity: 0.9 }]}
-                accessibilityRole="button"
-                accessibilityLabel="Add friends"
-              >
-                <Ionicons name="person-add-outline" size={14} color="#1E5872" />
-                <Text style={styles.pillBtnText}>Add Friends</Text>
-              </Pressable>
             </View>
           </View>
 
@@ -127,23 +384,52 @@ export default function HomePage() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>My Trip</Text>
-            <Pressable onPress={() => router.push("/Trip/create")} style={styles.linkPill}>
-              <Text style={styles.linkPillText}>Add Trip +</Text>
-            </Pressable>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <Pressable onPress={() => router.push("/Mainapp/buildmytrippage")} style={styles.linkPill}>
+                <Text style={styles.linkPillText}>Add Trip +</Text>
+              </Pressable>
+              <Pressable onPress={() => setJoinOpen(true)} style={styles.linkPill}>
+                <Text style={styles.linkPillText}>Join via Link</Text>
+              </Pressable>
+            </View>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
-            {myTrips.map((t, i) => (
-              <TripCard
-                key={`${t.title}-${i}`}
-                item={t}
-                onPress={() => router.push({ pathname: "/Trip/detail", params: { title: t.title } })}
-              />
-            ))}
-          </ScrollView>
+          {loading ? (
+            <ActivityIndicator />
+          ) : !hasPublished ? (
+            <Text style={{ color: "#8A8A8A", marginTop: 8 }}>
+              No trips yet. Create or join a trip to get started.
+            </Text>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.hList}
+            >
+              {filtered.map((t) => (
+                <TripCard
+                  key={t.id}
+                  title={t.name}
+                  image={getImage(t.id)}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/Mainapp/viewdetailpage",
+                      params: {
+                        id: t.id,
+                        start: t.start_date,
+                        end: t.end_date,
+                        isCreator: ownTripIds.includes(t.id) ? "1" : "0",
+                      },
+                    })
+                  }
+                />
+              ))}
+              <View style={{ width: 16 }} />
+            </ScrollView>
+          )}
         </View>
 
-        {/* Favorite Trip (เพิ่มช่องว่างพิเศษ) */}
+        {/* Favorite Trip (placeholder) */}
         <View style={[styles.section, styles.sectionGapLg]}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Favorite Trip</Text>
@@ -151,22 +437,104 @@ export default function HomePage() {
               <Text style={styles.linkPillText}>Add Favorite +</Text>
             </Pressable>
           </View>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
-            {favoriteTrips.map((t, i) => (
-              <TripCard
-                key={`${t.title}-${i}`}
-                item={t}
-                onPress={() => router.push({ pathname: "/Trip/detail", params: { title: t.title } })}
-              />
-            ))}
-            <View style={{ width: 16 }} />
-          </ScrollView>
         </View>
 
-        {/* spacer เพื่อไม่ให้ content ชนแถบล่าง */}
         <View style={{ height: 110 }} />
       </ScrollView>
+
+      {/* Modal: Join via Link */}
+      <Modal
+        visible={joinOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => (!joining ? setJoinOpen(false) : null)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.35)",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              width: "100%",
+              maxWidth: 460,
+              backgroundColor: "#fff",
+              borderRadius: 16,
+              padding: 16,
+              gap: 10,
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: "700" }}>Join via Link</Text>
+            <Text style={{ color: "#6B7280" }}>
+              Paste the invite link or token below. We’ll store the token and join the trip.
+            </Text>
+
+            <TextInput
+              placeholder="https://... or invitation token"
+              value={joinInput}
+              onChangeText={setJoinInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={{
+                borderWidth: 1,
+                borderColor: "#E5E7EB",
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                fontSize: 14,
+              }}
+            />
+
+            <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 6 }}>
+              <Pressable
+                onPress={pasteFromClipboard}
+                style={({ pressed }) => ({
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  backgroundColor: pressed ? "#F3F4F6" : "#F9FAFB",
+                })}
+              >
+                <Text style={{ fontWeight: "700", color: "#111827" }}>Paste</Text>
+              </Pressable>
+
+              <Pressable
+                disabled={joining}
+                onPress={() => setJoinOpen(false)}
+                style={({ pressed }) => ({
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  backgroundColor: pressed ? "#F3F4F6" : "#F9FAFB",
+                  opacity: joining ? 0.6 : 1,
+                })}
+              >
+                <Text style={{ fontWeight: "700", color: "#6B7280" }}>Cancel</Text>
+              </Pressable>
+
+              <Pressable
+                disabled={joining}
+                onPress={submitJoin}
+                style={({ pressed }) => ({
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  backgroundColor: joining ? "#BEE3F8" : pressed ? "#1E88E5" : "#2196F3",
+                  opacity: joining ? 0.9 : 1,
+                })}
+              >
+                <Text style={{ fontWeight: "700", color: "#fff" }}>
+                  {joining ? "Joining..." : "Join"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <BottomBar />
     </View>

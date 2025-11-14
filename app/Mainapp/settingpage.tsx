@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, Pressable, ScrollView, ActivityIndicator, InteractionManager } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, InteractionManager, Pressable, ScrollView, Text, View } from "react-native";
 import { styles } from "./styles/settingstyles";
 
-const BASE_URL = "http://localhost:8080"; // Android Emulator ใช้ 10.0.2.2
+const BASE_URL = "https://undeclamatory-precollegiate-felicitas.ngrok-free.dev"; // Android Emulator ใช้ 10.0.2.2
 const LOGIN_HREF = "/Auth/login"; // 👈 ปรับให้ตรงกับไฟล์จริงของคุณ
 
 export default function SettingPage() {

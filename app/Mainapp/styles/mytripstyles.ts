@@ -1,3 +1,4 @@
+// app/Mainapp/styles/mytripstyles.ts
 import { StyleSheet } from "react-native";
 
 export const COLORS = {
@@ -46,7 +47,7 @@ export const styles = StyleSheet.create({
     marginHorizontal: 12,
     borderRadius: 18,
     paddingHorizontal: 18,
-    paddingTop: 22,        // ขยับหัวลงตามที่ขอ
+    paddingTop: 22, // ขยับหัวลงตามที่ขอ
     paddingBottom: 18,
     flexDirection: "row",
     alignItems: "center",
@@ -101,6 +102,7 @@ export const styles = StyleSheet.create({
 
   /* ---------- Card ---------- */
   card: {
+    position: "relative", // ให้ปุ่มลอยทับได้
     flexDirection: "row",
     gap: 12,
     padding: 12,
@@ -114,10 +116,29 @@ export const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
+  // ปุ่มคัดลอกลิงก์มุมขวาบน
+  copyBtn: {
+    position: "absolute",
+    right: 10,
+    top: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#EEF4F8",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
   cardImage: {
     width: 120,
     height: 96,
     borderRadius: 12,
+    backgroundColor: "#E9EEF3",
   },
   cardHeaderRow: {
     flexDirection: "row",
@@ -148,6 +169,8 @@ export const styles = StyleSheet.create({
     gap: 10,
     marginTop: 10,
   },
+
+  /* ---------- Buttons ---------- */
   btnPrimary: {
     height: 40,
     paddingHorizontal: 18,
@@ -156,10 +179,15 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  btnPrimaryDisabled: {
+    backgroundColor: "#BFD3E1",
+  },
   btnPrimaryText: {
     fontWeight: "800",
     color: "#FFFFFF",
   },
+  btnPrimaryTextDisabled: { opacity: 0.9 },
+
   btnSoft: {
     height: 40,
     paddingHorizontal: 18,
@@ -196,7 +224,7 @@ export const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     right: 18,
-    bottom: 110,               // อยู่เหนือ BottomBar
+    bottom: 110, // อยู่เหนือ BottomBar
     width: 76,
     height: 76,
     borderRadius: 18,
@@ -210,7 +238,7 @@ export const styles = StyleSheet.create({
     elevation: 6,
   },
 
-  /* ---------- Bottom Bar (เหมือนหน้า Home) ---------- */
+  /* ---------- Bottom Bar ---------- */
   bottomBar: {
     position: "absolute",
     left: 0,
@@ -229,7 +257,12 @@ export const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-  tabItem: { alignItems: "center", justifyContent: "center", minWidth: 70, gap: 6 },
+  tabItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 70,
+    gap: 6,
+  },
   iconWrap: {
     width: 44,
     height: 44,
@@ -246,6 +279,12 @@ export const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 6,
   },
-  tabLabel: { fontSize: 12, color: "#8E8E8E", fontWeight: "700" },
-  tabLabelActive: { color: "#2F6284" },
+  tabLabel: {
+    fontSize: 12,
+    color: "#8E8E8E",
+    fontWeight: "700",
+  },
+  tabLabelActive: {
+    color: "#2F6284",
+  },
 });

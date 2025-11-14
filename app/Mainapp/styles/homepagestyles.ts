@@ -36,6 +36,7 @@ export const styles = StyleSheet.create({
   },
 
   avatar: {
+    marginTop: 40,
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -47,10 +48,10 @@ export const styles = StyleSheet.create({
 
   // ชื่อ – ให้ต่ำลงเล็กน้อยพอดีสายตา
   profileName: {
-    fontSize: 20,
+    fontSize: 23,
     fontWeight: "800",
     color: COLORS.text,
-    marginTop: 40,             // ปรับขยับให้ส่วนหัวลงมา
+    marginTop: 30,             // ปรับขยับให้ส่วนหัวลงมา
   },
 
   pillBtn: {
@@ -75,12 +76,12 @@ export const styles = StyleSheet.create({
   settingLabel: { marginTop: 6, color: "#8A8A8A", fontSize: 11, textAlign: "center" },
 
   // ===== Sections =====
-  section: { marginTop: 14 },
+  section: { marginTop: 34 },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 10,
+    marginBottom: 20,
   },
   sectionTitle: { fontSize: 20, fontWeight: "800", color: COLORS.text },
 

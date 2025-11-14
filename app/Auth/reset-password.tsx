@@ -14,7 +14,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { styles } from './styles/resetstyles';
 
-const RESET_URL = 'http://localhost:8080/api/auth/reset-password';
+const RESET_URL = 'https://undeclamatory-precollegiate-felicitas.ngrok-free.dev/api/auth/reset-password';
 
 async function requestResetPassword({
   password,
