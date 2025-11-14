@@ -22,6 +22,14 @@ import { COLORS, styles } from "./styles/mytripstyles";
 
 const BASE_URL = "https://undeclamatory-precollegiate-felicitas.ngrok-free.dev";
 
+/* ---------- DEBUG HELPERS ---------- */
+const DEBUG_TRIP = true;
+const dlog = (...args: any[]) => {
+  if (__DEV__ && DEBUG_TRIP) {
+    console.log("[MyTrip]", ...args);
+  }
+};
+
 /* ---------- Types ---------- */
 type ApiTrip = {
   id: string;
@@ -32,6 +40,9 @@ type ApiTrip = {
   total_budget: number;
   start_date: string;
   end_date: string;
+  owner_email?: string;
+  created_by?: string;
+  creator_id?: string; // 👈 ใช้ให้ตรงกับ viewdetail
 };
 
 type TripsResponse = {
@@ -51,6 +62,7 @@ type DraftTrip = {
 
 function fmt(d: string) {
   const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return d;
   const day = dt.getDate().toString().padStart(2, "0");
   const mon = dt.toLocaleString("en-US", { month: "short" });
   const yr = dt.getFullYear();
@@ -66,6 +78,8 @@ const KEY_JOINED_TRIPS = (email: string) => keyScoped(email, "JOINED_TRIPS");
 const KEY_INVITE_LINK_MAP = (email: string) => keyScoped(email, "INVITE_LINK_MAP");
 const KEY_TRIP_DRAFTS = (email: string) => keyScoped(email, "TRIP_DRAFTS");
 const KEY_ACTIVE_EMAIL = "ACTIVE_EMAIL";
+const KEY_ACTIVE_USER_ID = "ACTIVE_USER_ID"; // 👈 cache user id
+const KEY_OWN_TRIP_IDS = (email: string) => keyScoped(email, "OWN_TRIP_IDS");
 
 /* ---------- Auth helpers ---------- */
 async function fetchWithAuth(path: string, init?: RequestInit) {
@@ -97,14 +111,44 @@ async function getActiveEmail(): Promise<string> {
       if (email) {
         await AsyncStorage.setItem("USER_EMAIL", String(email));
         await AsyncStorage.setItem(KEY_ACTIVE_EMAIL, String(email));
+        dlog("getActiveEmail from API:", email);
         return String(email);
       }
     }
-  } catch {}
+  } catch (err) {
+    dlog("getActiveEmail error:", err);
+  }
   const cached =
     (await AsyncStorage.getItem(KEY_ACTIVE_EMAIL)) ||
     (await AsyncStorage.getItem("USER_EMAIL")) ||
     "anon";
+  dlog("getActiveEmail from cache:", cached);
+  return cached;
+}
+
+async function getActiveUserId(): Promise<string> {
+  try {
+    const res = await fetchWithAuth(`${BASE_URL}/api/auth/profile`);
+    if (res.ok) {
+      const p = await res.json().catch(() => ({} as any));
+
+      const id =
+        (p && (p.id || p.user?.id || p.data?.id || p.profile?.id)) ||
+        (await AsyncStorage.getItem(KEY_ACTIVE_USER_ID)) ||
+        "";
+
+      if (id) {
+        await AsyncStorage.setItem(KEY_ACTIVE_USER_ID, String(id));
+        dlog("getActiveUserId from API:", id);
+        return String(id);
+      }
+    }
+  } catch (err) {
+    dlog("getActiveUserId error:", err);
+  }
+
+  const cached = (await AsyncStorage.getItem(KEY_ACTIVE_USER_ID)) || "";
+  dlog("getActiveUserId from cache:", cached);
   return cached;
 }
 
@@ -113,6 +157,7 @@ async function readDrafts(email: string): Promise<DraftTrip[]> {
   try {
     const raw = await AsyncStorage.getItem(KEY_TRIP_DRAFTS(email));
     const list = raw ? JSON.parse(raw) : [];
+    dlog("readDrafts raw:", raw);
     return list.map((x: any) => ({
       ...x,
       title: x.title ?? x.name ?? "",
@@ -121,14 +166,18 @@ async function readDrafts(email: string): Promise<DraftTrip[]> {
       destination: x.destination ?? "",
       coverUri: x.coverUri ?? x.cover_uri ?? undefined,
     })) as DraftTrip[];
-  } catch {
+  } catch (err) {
+    dlog("readDrafts error:", err);
     return [];
   }
 }
 async function writeDrafts(email: string, list: DraftTrip[]) {
   try {
     await AsyncStorage.setItem(KEY_TRIP_DRAFTS(email), JSON.stringify(list));
-  } catch {}
+    dlog("writeDrafts:", list.map((d) => d.id));
+  } catch (err) {
+    dlog("writeDrafts error:", err);
+  }
 }
 function apiTripToDraft(t: ApiTrip): DraftTrip {
   return {
@@ -143,41 +192,72 @@ function apiTripToDraft(t: ApiTrip): DraftTrip {
 async function readHidden(email: string): Promise<string[]> {
   try {
     const raw = await AsyncStorage.getItem(KEY_HIDDEN_PUBLISHED(email));
-    return raw ? JSON.parse(raw) : [];
-  } catch {
+    const v = raw ? JSON.parse(raw) : [];
+    dlog("readHidden:", v);
+    return v;
+  } catch (err) {
+    dlog("readHidden error:", err);
     return [];
   }
 }
 async function writeHidden(email: string, ids: string[]) {
   try {
     await AsyncStorage.setItem(KEY_HIDDEN_PUBLISHED(email), JSON.stringify(ids));
-  } catch {}
+    dlog("writeHidden:", ids);
+  } catch (err) {
+    dlog("writeHidden error:", err);
+  }
 }
 async function readJoined(email: string): Promise<Set<string>> {
   try {
     const raw = await AsyncStorage.getItem(KEY_JOINED_TRIPS(email));
     const arr: string[] = raw ? JSON.parse(raw) : [];
+    dlog("readJoined raw:", raw);
     return new Set(arr);
-  } catch {
+  } catch (err) {
+    dlog("readJoined error:", err);
     return new Set();
   }
 }
 async function writeJoined(email: string, setIds: Set<string>) {
   const arr = Array.from(setIds);
   await AsyncStorage.setItem(KEY_JOINED_TRIPS(email), JSON.stringify(arr));
+  dlog("writeJoined:", arr);
 }
 async function readInviteLinkMap(email: string): Promise<Record<string, string>> {
   try {
     const raw = await AsyncStorage.getItem(KEY_INVITE_LINK_MAP(email));
-    return raw ? JSON.parse(raw) : {};
-  } catch {
+    const v = raw ? JSON.parse(raw) : {};
+    dlog("readInviteLinkMap:", v);
+    return v;
+  } catch (err) {
+    dlog("readInviteLinkMap error:", err);
     return {};
   }
 }
 async function writeInviteLinkMap(email: string, m: Record<string, string>) {
   try {
     await AsyncStorage.setItem(KEY_INVITE_LINK_MAP(email), JSON.stringify(m));
-  } catch {}
+    dlog("writeInviteLinkMap:", m);
+  } catch (err) {
+    dlog("writeInviteLinkMap error:", err);
+  }
+}
+async function readOwnTripIds(email: string): Promise<Set<string>> {
+  try {
+    const raw = await AsyncStorage.getItem(KEY_OWN_TRIP_IDS(email));
+    const arr: string[] = raw ? JSON.parse(raw) : [];
+    dlog("readOwnTripIds raw:", raw);
+    return new Set(arr);
+  } catch (err) {
+    dlog("readOwnTripIds error:", err);
+    return new Set();
+  }
+}
+async function writeOwnTripIds(email: string, setIds: Set<string>) {
+  const arr = Array.from(setIds);
+  await AsyncStorage.setItem(KEY_OWN_TRIP_IDS(email), JSON.stringify(arr));
+  dlog("writeOwnTripIds:", arr);
 }
 
 /* ---------- BottomBar ---------- */
@@ -307,30 +387,105 @@ export default function MyTripPage() {
   const [hidden, setHidden] = useState<string[]>([]);
   const [coverMap, setCoverMap] = useState<Record<string, string>>({});
   const [inviteLinkMap, setInviteLinkMap] = useState<Record<string, string>>({});
+  const [ownTripIds, setOwnTripIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  /* ----- Helpers ----- */
   const getImage = (id?: string) => {
     if (id && coverMap[id]) return { uri: coverMap[id] };
-    return null; // => TripCard จะขึ้น "No picture"
+    return null;
   };
 
   /* ----- Loaders ----- */
   const fetchPublished = useCallback(async (currentEmail: string) => {
     setLoading(true);
     try {
+      dlog("fetchPublished for email:", currentEmail);
+
       const res = await fetchWithAuth(
         `${BASE_URL}/api/trips?status=published&limit=100&offset=0`
       );
       const js: TripsResponse | any = await res.json().catch(() => ({}));
-      const all: ApiTrip[] = Array.isArray(js?.trips) ? js.trips : Array.isArray(js) ? js : [];
 
-      // กรองเฉพาะทริปที่ user นี้ "เข้าร่วม/สร้าง" จากชุด JOINED_TRIPS (per-user)
+      const all: ApiTrip[] = Array.isArray(js?.trips) ? js.trips : Array.isArray(js) ? js : [];
+      dlog(
+        "trips from API:",
+        all.map((t) => ({
+          id: t.id,
+          name: t.name,
+          owner_email: t.owner_email,
+          created_by: t.created_by,
+          creator_id: t.creator_id,
+        }))
+      );
+
       const joined = await readJoined(currentEmail);
+      dlog("joined set:", Array.from(joined));
+
+      // user เห็นเฉพาะทริปที่ตัวเอง join อยู่
       const mine = all.filter((t) => joined.has(t.id));
+      dlog("mine (joined && published):", mine.map((t) => t.id));
       setPublished(mine);
-    } catch {
+
+      // debug keys
+      const allKeys = (await AsyncStorage.getAllKeys()) || [];
+      dlog(
+        "All AS keys (filter CREATE_TRIP):",
+        allKeys.filter((k) => k.includes("CREATE_TRIP"))
+      );
+
+      // ---------- build ownTripIds ----------
+      const storedOwn = await readOwnTripIds(currentEmail);
+      const ownSet = new Set<string>(storedOwn);
+      const myEmailLower = currentEmail.toLowerCase();
+      const currentUserId = await getActiveUserId();
+
+      for (const t of mine) {
+        const formKey = `CREATE_TRIP_FORM_${t.id}`;
+        const localForm = await AsyncStorage.getItem(formKey);
+
+        const ownerRaw = String(t.owner_email || t.created_by || "");
+        const ownerLower = ownerRaw.toLowerCase();
+        const looksLikeEmail = ownerRaw.includes("@");
+
+        const isCreatorByForm = !!localForm;
+        const isCreatorByEmail =
+          looksLikeEmail && !!myEmailLower && myEmailLower === ownerLower;
+        const isCreatorById =
+          !!currentUserId && !!t.creator_id && String(t.creator_id) === String(currentUserId);
+
+        if (isCreatorByForm || isCreatorByEmail || isCreatorById) {
+          ownSet.add(t.id);
+          dlog("Creator detected:", {
+            id: t.id,
+            name: t.name,
+            isCreatorByForm,
+            isCreatorByEmail,
+            isCreatorById,
+            ownerRaw,
+            creator_id: t.creator_id,
+            currentUserId,
+            formKey,
+            hasCreateForm: !!localForm,
+          });
+        } else {
+          dlog("Not creator:", {
+            id: t.id,
+            name: t.name,
+            ownerRaw,
+            creator_id: t.creator_id,
+            currentUserId,
+            looksLikeEmail,
+            myEmailLower,
+          });
+        }
+      }
+
+      await writeOwnTripIds(currentEmail, ownSet);
+      setOwnTripIds(Array.from(ownSet));
+      dlog("ownTripIds (after scan):", Array.from(ownSet));
+    } catch (err) {
+      dlog("fetchPublished error:", err);
       setPublished([]);
     } finally {
       setLoading(false);
@@ -340,28 +495,35 @@ export default function MyTripPage() {
   const loadAll = useCallback(async () => {
     const e = await getActiveEmail();
     setEmail(e);
+    dlog("loadAll() active email:", e);
 
     setDrafts(await readDrafts(e));
     setHidden(await readHidden(e));
 
     try {
       const raw = await AsyncStorage.getItem(KEY_TRIP_COVER_MAP(e));
-      setCoverMap(raw ? JSON.parse(raw) : {});
-    } catch {
+      const map = raw ? JSON.parse(raw) : {};
+      dlog("coverMap:", map);
+      setCoverMap(map);
+    } catch (err) {
+      dlog("read coverMap error:", err);
       setCoverMap({});
     }
 
     setInviteLinkMap(await readInviteLinkMap(e));
+
     await fetchPublished(e);
   }, [fetchPublished]);
 
   useFocusEffect(
     useCallback(() => {
+      dlog("useFocusEffect -> loadAll()");
       loadAll();
     }, [loadAll])
   );
 
   const onRefresh = async () => {
+    dlog("onRefresh()");
     setRefreshing(true);
     await loadAll();
     setRefreshing(false);
@@ -369,6 +531,7 @@ export default function MyTripPage() {
 
   /* ----- Actions ----- */
   const moveToDraft = async (t: ApiTrip) => {
+    dlog("moveToDraft trip:", t.id);
     const newDraft = { ...apiTripToDraft(t), coverUri: coverMap[t.id] };
     const nextDrafts = [...drafts, newDraft];
     await writeDrafts(email, nextDrafts);
@@ -383,6 +546,7 @@ export default function MyTripPage() {
   };
 
   const publishDraft = async (d: DraftTrip) => {
+    dlog("publishDraft:", d.id);
     const token = await AsyncStorage.getItem("TOKEN");
     if (!token) return;
     try {
@@ -401,9 +565,13 @@ export default function MyTripPage() {
           status: "published",
         }),
       });
+      dlog("publishDraft response status:", res.status);
       if (!res.ok) throw new Error();
       const json: any = await res.json();
+      dlog("publishDraft response json:", json);
+
       const newId = json?.trip?.id || json?.id;
+      dlog("new trip id from draft:", newId);
 
       if (newId && d.coverUri) {
         try {
@@ -412,7 +580,21 @@ export default function MyTripPage() {
           map[newId] = d.coverUri;
           await AsyncStorage.setItem(KEY_TRIP_COVER_MAP(email), JSON.stringify(map));
           setCoverMap(map);
-        } catch {}
+          dlog("updated coverMap with newId:", newId);
+        } catch (err) {
+          dlog("update coverMap error:", err);
+        }
+      }
+
+      if (newId) {
+        const own = await readOwnTripIds(email);
+        own.add(String(newId));
+        await writeOwnTripIds(email, own);
+        setOwnTripIds(Array.from(own));
+
+        const joined = await readJoined(email);
+        joined.add(String(newId));
+        await writeJoined(email, joined);
       }
 
       const next = drafts.filter((x) => x.id !== d.id);
@@ -420,13 +602,15 @@ export default function MyTripPage() {
       setDrafts(next);
       Alert.alert("Published", "Trip has been published.");
       await fetchPublished(email);
-    } catch {
+    } catch (err) {
+      dlog("publishDraft error:", err);
       Alert.alert("Error", "Cannot publish draft.");
     }
   };
 
   /* ----- Copy Invite Link ----- */
   const copyInvite = async (tripId: string) => {
+    dlog("copyInvite trip:", tripId);
     try {
       if (inviteLinkMap[tripId]) {
         await Clipboard.setStringAsync(inviteLinkMap[tripId]);
@@ -448,11 +632,13 @@ export default function MyTripPage() {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
+      dlog("copyInvite status:", res.status);
 
       let js: any = {};
       try {
         js = await res.json();
       } catch {}
+      dlog("copyInvite json:", js);
 
       if (!res.ok) {
         const msg = js?.message || js?.error || `HTTP ${res.status}`;
@@ -473,14 +659,16 @@ export default function MyTripPage() {
       await Clipboard.setStringAsync(link);
       Alert.alert("Copied", "Invitation link copied to clipboard.");
     } catch (err) {
-      console.error(err);
+      dlog("copyInvite error:", err);
       Alert.alert("Error", "Failed to copy invite link.");
     }
   };
 
-  /* ----- UI Helpers ----- */
   const publishedList = published.filter((p) => !hidden.includes(p.id));
   const listEmpty = tab === "published" ? "No published trips yet." : "No draft trips yet.";
+
+  const myEmailLower = (email || "").toLowerCase();
+  dlog("render MyTripPage, email:", email, "ownTripIds:", ownTripIds);
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
@@ -490,7 +678,15 @@ export default function MyTripPage() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {/* Header */}
-        <View style={[styles.topBar, { paddingTop: Math.max(insets.top, Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0) + 8, paddingBottom: 6 }]} />
+        <View
+          style={[
+            styles.topBar,
+            {
+              paddingTop: topPad,
+              paddingBottom: 6,
+            },
+          ]}
+        />
 
         {/* Hero */}
         <View style={[styles.hero, { marginTop: 8 }]}>
@@ -535,31 +731,63 @@ export default function MyTripPage() {
             ) : publishedList.length === 0 ? (
               <Text style={styles.emptyText}>{listEmpty}</Text>
             ) : (
-              publishedList.map((t) => (
-                <TripCard
-                  key={t.id}
-                  image={getImage(t.id)}
-                  title={t.name}
-                  destination={t.destination}
-                  start={t.start_date}
-                  end={t.end_date}
-                  buttonRight="Draft"
-                  showCopy
-                  onCopy={() => copyInvite(t.id)}
-                  onView={() =>
-                    router.push({
-                      pathname: "/Mainapp/viewdetailpage",
-                      params: {
-                        id: t.id,
-                        isCreator: "1",
-                        start: t.start_date,
-                        end: t.end_date,
-                      },
-                    })
-                  }
-                  onRightPress={() => moveToDraft(t)}
-                />
-              ))
+              publishedList.map((t) => {
+                const ownerRaw = String((t.owner_email ?? t.created_by ?? "") || "");
+                const ownerLower = ownerRaw.toLowerCase();
+                const looksLikeEmail = ownerRaw.includes("@");
+
+                const isCreator =
+                  ownTripIds.includes(t.id) ||
+                  (looksLikeEmail && !!myEmailLower && myEmailLower === ownerLower);
+
+                if (__DEV__ && DEBUG_TRIP) {
+                  dlog("render card trip:", t.id, {
+                    name: t.name,
+                    ownerRaw,
+                    myEmailLower,
+                    looksLikeEmail,
+                    isCreator,
+                    ownTripIds,
+                    creator_id: t.creator_id,
+                  });
+                }
+
+                return (
+                  <TripCard
+                    key={t.id}
+                    image={getImage(t.id)}
+                    title={t.name}
+                    destination={t.destination}
+                    start={t.start_date}
+                    end={t.end_date}
+                    buttonRight={isCreator ? "Draft" : "Joined"}
+                    showCopy
+                    onCopy={() => copyInvite(t.id)}
+                    onView={() =>
+                      router.push({
+                        pathname: "/Mainapp/viewdetailpage",
+                        params: {
+                          id: t.id,
+                          isCreator: isCreator ? "1" : "0",
+                          start: t.start_date,
+                          end: t.end_date,
+                        },
+                      })
+                    }
+                    onRightPress={() => {
+                      dlog("press right button trip:", t.id, "isCreator:", isCreator);
+                      if (!isCreator) {
+                        Alert.alert(
+                          "Not allowed",
+                          "You can only move trips you created into Draft."
+                        );
+                        return;
+                      }
+                      moveToDraft(t);
+                    }}
+                  />
+                );
+              })
             )
           ) : drafts.length === 0 ? (
             <Text style={styles.emptyText}>{listEmpty}</Text>

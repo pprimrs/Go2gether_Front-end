@@ -37,6 +37,7 @@ const KEY_HIDDEN_PUBLISHED = (email: string) => keyScoped(email, "HIDDEN_PUBLISH
 const KEY_JOINED_TRIPS = (email: string) => keyScoped(email, "JOINED_TRIPS");
 const KEY_ACTIVE_EMAIL = "ACTIVE_EMAIL";
 const KEY_LAST_INVITE_TOKEN = (email: string) => keyScoped(email, "LAST_INVITE_TOKEN");
+const KEY_OWN_TRIP_IDS = (email: string) => keyScoped(email, "OWN_TRIP_IDS");
 
 /* ---------- Helpers ---------- */
 async function fetchWithAuth(path: string, init?: RequestInit) {
@@ -108,6 +109,15 @@ async function writeJoined(email: string, setIds: Set<string>) {
   const arr = Array.from(setIds);
   await AsyncStorage.setItem(KEY_JOINED_TRIPS(email), JSON.stringify(arr));
 }
+async function readOwnTripIds(email: string): Promise<Set<string>> {
+  try {
+    const raw = await AsyncStorage.getItem(KEY_OWN_TRIP_IDS(email));
+    const arr: string[] = raw ? JSON.parse(raw) : [];
+    return new Set(arr);
+  } catch {
+    return new Set();
+  }
+}
 
 /* ---------- Normalizer ---------- */
 function isApiTrip(x: any): x is ApiTrip {
@@ -131,10 +141,6 @@ function normalizeTrips(input: any): ApiTrip[] {
 }
 
 /* ---------- Utils: extract invitation token ---------- */
-/** รองรับ:
- *   http://localhost:8081/trips/<uuid>/join?token=<jwt>
- *   หรือวาง token (JWT) ตรง ๆ
- */
 function extractInviteToken(input: string): string | undefined {
   if (!input) return undefined;
   const s = input.trim();
@@ -223,6 +229,7 @@ export default function HomePage() {
   const [published, setPublished] = useState<ApiTrip[]>([]);
   const [coverMap, setCoverMap] = useState<Record<string, string>>({});
   const [hidden, setHidden] = useState<string[]>([]);
+  const [ownTripIds, setOwnTripIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Modal: Join via Link
@@ -270,6 +277,8 @@ export default function HomePage() {
         setEmail(e);
         await loadUserName();
         await loadLocalMaps(e);
+        const own = await readOwnTripIds(e);
+        setOwnTripIds(Array.from(own));
         await fetchPublished(e);
       })();
     }, [loadUserName, loadLocalMaps, fetchPublished])
@@ -289,7 +298,6 @@ export default function HomePage() {
     }
   };
 
-  // guard กันการยิงซ้ำจาก onPress
   let inFlight = false;
   const submitJoin = async () => {
     if (inFlight || joining) return;
@@ -306,10 +314,8 @@ export default function HomePage() {
     inFlight = true;
     setJoining(true);
     try {
-      // เก็บ token ไว้ใช้ภายหลัง
       await AsyncStorage.setItem(KEY_LAST_INVITE_TOKEN(email), token);
 
-      // ส่งตามสเปก Swagger: { invitation_token: string }
       const res = await fetchWithAuth(`${BASE_URL}/api/trips/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -327,7 +333,6 @@ export default function HomePage() {
         throw new Error(msg);
       }
 
-      // บันทึก trip ที่เข้าร่วม (ถ้ามีคืนมา)
       const joined = await readJoined(email);
       const tripIdFromRes: string = js?.trip?.id || js?.id || js?.trip_id || "";
       if (tripIdFromRes) joined.add(String(tripIdFromRes));
@@ -383,7 +388,6 @@ export default function HomePage() {
               <Pressable onPress={() => router.push("/Mainapp/buildmytrippage")} style={styles.linkPill}>
                 <Text style={styles.linkPillText}>Add Trip +</Text>
               </Pressable>
-              {/* ปุ่มเปิด Modal Join */}
               <Pressable onPress={() => setJoinOpen(true)} style={styles.linkPill}>
                 <Text style={styles.linkPillText}>Join via Link</Text>
               </Pressable>
@@ -410,7 +414,12 @@ export default function HomePage() {
                   onPress={() =>
                     router.push({
                       pathname: "/Mainapp/viewdetailpage",
-                      params: { id: t.id, start: t.start_date, end: t.end_date },
+                      params: {
+                        id: t.id,
+                        start: t.start_date,
+                        end: t.end_date,
+                        isCreator: ownTripIds.includes(t.id) ? "1" : "0",
+                      },
                     })
                   }
                 />
@@ -430,11 +439,10 @@ export default function HomePage() {
           </View>
         </View>
 
-        {/* spacer */}
         <View style={{ height: 110 }} />
       </ScrollView>
 
-      {/* ===== Modal: Join via Link ===== */}
+      {/* Modal: Join via Link */}
       <Modal
         visible={joinOpen}
         transparent
