@@ -1,3 +1,4 @@
+// app/Mainapp/buildmytrippage.tsx
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
@@ -27,7 +28,11 @@ const keyScoped = (email: string, base: string) => `${USER_NS(email)}:${base}`;
 const KEY_TRIP_DRAFTS = (email: string) => keyScoped(email, "TRIP_DRAFTS");
 const KEY_TRIP_COVER_MAP = (email: string) => keyScoped(email, "TRIP_COVER_MAP");
 const KEY_JOINED_TRIPS = (email: string) => keyScoped(email, "JOINED_TRIPS");
+const KEY_TRIP_BUDGET_MAP = (email: string) => keyScoped(email, "TRIP_BUDGET_MAP"); // เก็บ budget แยกหมวด (ใช้กับ draft/local)
 const KEY_ACTIVE_EMAIL = "ACTIVE_EMAIL";
+
+// เก็บ trip id ล่าสุดไว้ ใช้คู่กับ auth_token เวลา debug / ใช้ในจุดอื่น
+const KEY_LAST_TRIP_ID = "LAST_TRIP_ID";
 
 async function fetchWithAuth(path: string, init?: RequestInit) {
   const token = await AsyncStorage.getItem("TOKEN");
@@ -64,7 +69,10 @@ async function getActiveEmail(): Promise<string> {
       }
     }
   } catch {}
-  const cached = (await AsyncStorage.getItem(KEY_ACTIVE_EMAIL)) || (await AsyncStorage.getItem("USER_EMAIL")) || "anon";
+  const cached =
+    (await AsyncStorage.getItem(KEY_ACTIVE_EMAIL)) ||
+    (await AsyncStorage.getItem("USER_EMAIL")) ||
+    "anon";
   return cached;
 }
 
@@ -80,7 +88,11 @@ async function addJoined(email: string, tripId: string) {
 /* ---------- helpers ---------- */
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
 const formatDate = (d?: Date) =>
-  !d ? "" : `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  !d
+    ? ""
+    : `${String(d.getDate()).padStart(2, "0")}/${String(
+        d.getMonth() + 1
+      ).padStart(2, "0")}/${d.getFullYear()}`;
 
 export default function BuildMyTripPage() {
   const [tripName, setTripName] = useState("");
@@ -94,16 +106,37 @@ export default function BuildMyTripPage() {
   const [picking, setPicking] = useState<"start" | "end">("start");
   const [tempDate, setTempDate] = useState<Date>(new Date());
 
-  // budgets
-  const [budget, setBudget] = useState({ food: "", hotel: "", shopping: "", transport: "" });
+  // budgets (string ใน input)
+  const [budget, setBudget] = useState({
+    food: "",
+    hotel: "",
+    shopping: "",
+    transport: "",
+  });
+
   const totalBudget = useMemo(() => {
     const n = (s: string) => Number(s || 0);
     return n(budget.food) + n(budget.hotel) + n(budget.shopping) + n(budget.transport);
   }, [budget]);
 
+  // เช็คว่าทุก budget กรอกครบ (ไม่ใช่ string ว่าง)
+  const hasAllBudget = useMemo(
+    () =>
+      ["food", "hotel", "shopping", "transport"].every(
+        (k) => budget[k as keyof typeof budget].trim() !== ""
+      ),
+    [budget]
+  );
+
   const canPublish = useMemo(
-    () => !!tripName.trim() && !!destination.trim() && !!startDate && !!endDate && endDate >= startDate,
-    [tripName, destination, startDate, endDate]
+    () =>
+      !!tripName.trim() &&
+      !!destination.trim() &&
+      !!startDate &&
+      !!endDate &&
+      endDate >= startDate &&
+      hasAllBudget,
+    [tripName, destination, startDate, endDate, hasAllBudget]
   );
 
   // image picker
@@ -157,8 +190,10 @@ export default function BuildMyTripPage() {
     if (!tripName.trim())
       return Alert.alert("Trip name required", "Please enter your trip name.");
 
+    const draftId = `draft_${Date.now()}`;
+
     const draft = {
-      id: `draft_${Date.now()}`,
+      id: draftId,
       title: tripName.trim(),
       destination: destination.trim(),
       startDate: startDate ? toISO(startDate) : "",
@@ -171,10 +206,31 @@ export default function BuildMyTripPage() {
 
     try {
       const email = await getActiveEmail();
+
+      // เก็บลงลิสต์ DRAFT เดิม
       const raw = await AsyncStorage.getItem(KEY_TRIP_DRAFTS(email));
       const list = raw ? JSON.parse(raw) : [];
       list.unshift(draft);
       await AsyncStorage.setItem(KEY_TRIP_DRAFTS(email), JSON.stringify(list));
+
+      // เก็บ budget แยกหมวดผูกกับ draftId (ใช้กับ FreeDay Budget แบบ local)
+      try {
+        const rawBudget = await AsyncStorage.getItem(KEY_TRIP_BUDGET_MAP(email));
+        const budgetMap = rawBudget ? JSON.parse(rawBudget) : {};
+        budgetMap[draftId] = {
+          hotel: Number(budget.hotel || 0),
+          food: Number(budget.food || 0),
+          shopping: Number(budget.shopping || 0),
+          transport: Number(budget.transport || 0),
+        };
+        await AsyncStorage.setItem(
+          KEY_TRIP_BUDGET_MAP(email),
+          JSON.stringify(budgetMap)
+        );
+      } catch {
+        // ถ้า error ก็ปล่อยผ่าน ไม่กระทบการ save draft
+      }
+
       Alert.alert("Saved to Draft", "Your trip draft has been saved locally.");
       router.replace("/Mainapp/mytrippage");
     } catch {
@@ -185,7 +241,10 @@ export default function BuildMyTripPage() {
   // PUBLISH — เรียก API และบันทึก cover map + JOINED_TRIPS (per-user)
   const onPublish = async () => {
     if (!canPublish)
-      return Alert.alert("Incomplete", "Please fill in required fields and date range.");
+      return Alert.alert(
+        "Incomplete",
+        "Please fill in required fields, date range and budget."
+      );
     setSubmitting(true);
     try {
       const payload = {
@@ -193,10 +252,18 @@ export default function BuildMyTripPage() {
         destination: destination.trim(),
         start_date: toISO(startDate!),
         end_date: toISO(endDate!),
-        currency: "THB",
-        total_budget: Number.isFinite(totalBudget) ? totalBudget : 0,
         description: "",
         status: "published",
+        currency: "THB",
+
+        // ส่ง budget แยกหมวดเข้า /api/trips ตามรูป Postman
+        food: Number(budget.food || 0),
+        hotel: Number(budget.hotel || 0),
+        shopping: Number(budget.shopping || 0),
+        transport: Number(budget.transport || 0),
+
+        // ถ้า backend ยังใช้ total_budget ด้วย ก็ส่งไปด้วย
+        total_budget: Number.isFinite(totalBudget) ? totalBudget : 0,
       };
 
       const res = await fetchWithAuth(`${BASE_URL}/api/trips`, {
@@ -206,7 +273,9 @@ export default function BuildMyTripPage() {
       });
 
       let json: any = {};
-      try { json = await res.json(); } catch {}
+      try {
+        json = await res.json();
+      } catch {}
 
       if (!res.ok) {
         const msg = json?.message || `Create trip failed (HTTP ${res.status}).`;
@@ -217,9 +286,9 @@ export default function BuildMyTripPage() {
       const trip = json?.trip || json;
       const tripId = trip?.id;
 
-      // per-user cover map + joined set
       const email = await getActiveEmail();
 
+      // cover per-user
       if (tripId && coverUri?.trim()) {
         try {
           const raw = await AsyncStorage.getItem(KEY_TRIP_COVER_MAP(email));
@@ -229,7 +298,26 @@ export default function BuildMyTripPage() {
         } catch {}
       }
 
+      // เก็บ budget แยกหมวดแบบ local ผูกกับ tripId (backup)
       if (tripId) {
+        try {
+          const rawBudget = await AsyncStorage.getItem(KEY_TRIP_BUDGET_MAP(email));
+          const budgetMap = rawBudget ? JSON.parse(rawBudget) : {};
+          budgetMap[tripId] = {
+            hotel: Number(budget.hotel || 0),
+            food: Number(budget.food || 0),
+            shopping: Number(budget.shopping || 0),
+            transport: Number(budget.transport || 0),
+          };
+          await AsyncStorage.setItem(
+            KEY_TRIP_BUDGET_MAP(email),
+            JSON.stringify(budgetMap)
+          );
+        } catch (err) {
+          console.warn("Save category budget locally failed", err);
+        }
+
+        await AsyncStorage.setItem(KEY_LAST_TRIP_ID, String(tripId));
         await addJoined(email, String(tripId)); // creator เห็นของตัวเอง
       }
 
@@ -288,7 +376,14 @@ export default function BuildMyTripPage() {
             <Pressable
               onPress={() => setCoverUri(undefined)}
               hitSlop={10}
-              style={{ position: "absolute", right: 52, bottom: 12, backgroundColor: "#0008", borderRadius: 12, padding: 6 }}
+              style={{
+                position: "absolute",
+                right: 52,
+                bottom: 12,
+                backgroundColor: "#0008",
+                borderRadius: 12,
+                padding: 6,
+              }}
             >
               <Ionicons name="close" size={14} color="#fff" />
             </Pressable>
@@ -372,7 +467,9 @@ export default function BuildMyTripPage() {
                 placeholder="0"
                 keyboardType="numeric"
                 value={budget[k]}
-                onChangeText={(v) => setBudget((b) => ({ ...b, [k]: v.replace(/[^\d]/g, "") }))}
+                onChangeText={(v) =>
+                  setBudget((b) => ({ ...b, [k]: v.replace(/[^\d]/g, "") }))
+                }
               />
               <Text style={styles.currency}>฿</Text>
             </View>
@@ -396,7 +493,10 @@ export default function BuildMyTripPage() {
               <ActivityIndicator />
             ) : (
               <Text
-                style={[styles.btnPrimaryText, !canPublish && styles.btnPrimaryTextDisabled]}
+                style={[
+                  styles.btnPrimaryText,
+                  !canPublish && styles.btnPrimaryTextDisabled,
+                ]}
               >
                 Publish
               </Text>

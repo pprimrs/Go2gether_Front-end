@@ -81,7 +81,7 @@ export const styles = StyleSheet.create({
   },
 
   card: {
-    width: "47%", // ✅ ลดขนาดเหลือประมาณครึ่งจอ
+    width: "47%",
     backgroundColor: "#fff",
     borderRadius: 16,
     borderWidth: 1,
@@ -96,13 +96,13 @@ export const styles = StyleSheet.create({
 
   cardImage: {
     width: "100%",
-    height: 110, // ✅ ลดความสูงของรูป
+    height: 110,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
   },
 
   cardTitle: {
-    fontSize: 14, // ✅ ตัวเล็กลง
+    fontSize: 14,
     fontWeight: "800",
     color: COLORS.cardTitle,
     marginTop: 6,
@@ -125,7 +125,6 @@ export const styles = StyleSheet.create({
     color: "#2F6284",
     fontSize: 13,
   },
-
 
   /* ---------- Bottom Bar ---------- */
   bottomBar: {
@@ -166,7 +165,7 @@ export const styles = StyleSheet.create({
   tabLabel: { fontSize: 12, color: "#8E8E8E", fontWeight: "700" },
   tabLabelActive: { color: "#2F6284" },
 
-  /* ---------- Modals (shared) ---------- */
+  /* ---------- Shared modal ---------- */
   modalBackdrop: {
     flex: 1,
     backgroundColor: COLORS.overlay,
@@ -192,6 +191,29 @@ export const styles = StyleSheet.create({
   },
   modalBtnGhostText: { color: "#2F6284", fontWeight: "800" },
 
+  // ปุ่มหลักใน modal (ใช้กับ Generate)
+  modalBtnPrimary: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: "#2F6284",
+  },
+  modalBtnPrimaryText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+  },
+
+  /* ---------- Text input (ใช้ใน Generate config) ---------- */
+  input: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 16,
+  },
+
   /* ---------- Free Day options ---------- */
   optionsWrap: { gap: 12, marginTop: 8 },
   optionRow: {
@@ -203,7 +225,12 @@ export const styles = StyleSheet.create({
     borderColor: "#E6EEF6",
     alignItems: "center",
   },
-  optionLabelCol: { width: 90, paddingRight: 10, borderRightWidth: 1, borderRightColor: "#E6EEF6" },
+  optionLabelCol: {
+    width: 90,
+    paddingRight: 10,
+    borderRightWidth: 1,
+    borderRightColor: "#E6EEF6",
+  },
   optionLabel: { fontWeight: "800", color: "#5C6E7C" },
   optionDatesCol: { flex: 1, paddingLeft: 12 },
   chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
@@ -241,7 +268,11 @@ export const styles = StyleSheet.create({
     borderColor: "#E9EFF4",
     padding: 12,
   },
-  budgetCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  budgetCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   budgetTitle: { fontWeight: "900", color: "#54718A" },
   budgetAmount: { marginTop: 6, fontWeight: "900", color: "#2D3F50" },
   progressTrack: {
@@ -267,8 +298,22 @@ export const styles = StyleSheet.create({
   sugPhoto: { width: 120, height: 86, borderRadius: 12, backgroundColor: "#E9EEF3" },
   sugHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
   sugCat: { fontSize: 16, fontWeight: "900", color: "#1F2E3A" },
-  sugWhen: { fontWeight: "900", color: "#4A89B1" },
+  sugWhen: { fontSize: 19, fontWeight: "900", color: "#4A89B1" },
   dotRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#6FA1C3", marginTop: 7 },
-  placeText: { flex: 1, color: "#1E2D38", fontWeight: "700" },
+  placeText: { color: "#0a456eff", fontWeight: "700" },
+    sugBlock: {
+    backgroundColor: "rgba(255,255,255,0.9)", // กรอบขาวขุ่น
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: "#E6EEF6",
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
 });
