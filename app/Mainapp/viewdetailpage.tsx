@@ -1,4 +1,3 @@
-// app/Mainapp/viewdetailpage.tsx
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
@@ -193,7 +192,7 @@ type TripDetail = {
   description?: string;
   owner_email?: string;
   created_by?: string;
-  creator_id?: string; // 👈 ใช้เช็ค owner จาก backend
+  creator_id?: string; // ใช้เช็ค owner จาก backend
 };
 
 export default function ViewDetailPage() {
@@ -218,7 +217,7 @@ export default function ViewDetailPage() {
   const [userEmail, setUserEmail] = useState("");
   const [ownTripIds, setOwnTripIds] = useState<string[]>([]);
   const [isCreatorFromLocalForm, setIsCreatorFromLocalForm] = useState(false);
-  const [userId, setUserId] = useState<string>(""); // 👈 id ของ user ปัจจุบัน
+  const [userId, setUserId] = useState<string>("");
 
   // Joiner form
   const [joinForm, setJoinForm] = useState({ activity: "" });
@@ -322,7 +321,7 @@ export default function ViewDetailPage() {
           description: String(t?.description ?? ""),
           owner_email: t?.owner_email ? String(t.owner_email) : undefined,
           created_by: t?.created_by ? String(t.created_by) : undefined,
-          creator_id: t?.creator_id ? String(t.creator_id) : undefined, // 👈 รับมาจาก API
+          creator_id: t?.creator_id ? String(t.creator_id) : undefined,
         };
 
         if (!cancelled) setTrip(normalized);
@@ -374,7 +373,6 @@ export default function ViewDetailPage() {
         const res = await fetchWithAuth(`${BASE_URL}/api/auth/profile`);
         if (!res.ok) return;
         const p = await res.json().catch(() => ({}));
-        // พยายามเดา field id จาก profile
         const idCandidate =
           firstNonEmpty(p, ["id", "user.id", "data.id", "profile.id"]) || "";
         if (idCandidate) {
@@ -637,7 +635,6 @@ export default function ViewDetailPage() {
 
   /** ---------- Leave Trip (joiner only) ---------- */
   const onLeaveTrip = async () => {
-    // กัน creator ไม่ให้ leave
     if (isCreator) {
       Alert.alert(
         "You created this trip",

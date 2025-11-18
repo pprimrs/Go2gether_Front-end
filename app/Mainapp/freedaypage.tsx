@@ -1,18 +1,18 @@
-// app/Mainapp/freedaypage.tsx
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { router, usePathname } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Modal,
   Platform,
   Pressable,
   ScrollView,
   StatusBar,
   Text,
+  TextInput,
   View,
-  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS, styles } from "./styles/freedaystyles";
@@ -38,6 +38,14 @@ type DraftTrip = {
   coverUri?: string;
 };
 
+type CategoryBudget = {
+  hotel?: number;
+  food?: number;
+  shopping?: number;
+  transport?: number;
+  total?: number; // จาก /api/trips/{id}/budget
+};
+
 type FreeDayItem = {
   id: string;
   originId?: string;
@@ -47,6 +55,7 @@ type FreeDayItem = {
   totalBudget?: number;
   budget?: "low" | "mid" | "high";
   source: "published" | "draft";
+  categoryBudget?: CategoryBudget;
 };
 
 type AvailabilityByUser = Record<string, string[]>;
@@ -55,10 +64,12 @@ type AvailabilityByUser = Record<string, string[]>;
 const USER_NS = (email: string) => `USER(${email})`;
 const keyScoped = (email: string, base: string) => `${USER_NS(email)}:${base}`;
 const KEY_TRIP_COVER_MAP = (email: string) => keyScoped(email, "TRIP_COVER_MAP");
-const KEY_HIDDEN_PUBLISHED = (email: string) => keyScoped(email, "HIDDEN_PUBLISHED_IDS");
+const KEY_HIDDEN_PUBLISHED = (email: string) =>
+  keyScoped(email, "HIDDEN_PUBLISHED_IDS");
 const KEY_TRIP_DRAFTS = (email: string) => keyScoped(email, "TRIP_DRAFTS");
 const KEY_JOINED_TRIPS = (email: string) => keyScoped(email, "JOINED_TRIPS");
 const KEY_ACTIVE_EMAIL = "ACTIVE_EMAIL";
+const KEY_TRIP_BUDGET_MAP = (email: string) => keyScoped(email, "TRIP_BUDGET_MAP");
 
 /* ---------- Budget band helper ---------- */
 function bandFromBudget(v?: number): "low" | "mid" | "high" | undefined {
@@ -98,7 +109,9 @@ function formatChip(ymdStr: string) {
 /* ---------- Auth helpers ---------- */
 async function fetchWithAuth(path: string, init?: RequestInit) {
   const token = await AsyncStorage.getItem("TOKEN");
-  const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) };
+  const headers: Record<string, string> = {
+    ...(init?.headers as Record<string, string>),
+  };
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(path, { ...init, headers });
   if (res.status === 401) {
@@ -116,8 +129,12 @@ async function getActiveEmail(): Promise<string> {
     if (res.ok) {
       const p = await res.json().catch(() => ({}));
       const email =
-        p?.email || p?.user?.email || p?.data?.email || p?.profile?.email ||
-        (await AsyncStorage.getItem("USER_EMAIL")) || "";
+        p?.email ||
+        p?.user?.email ||
+        p?.data?.email ||
+        p?.profile?.email ||
+        (await AsyncStorage.getItem("USER_EMAIL")) ||
+        "";
       if (email) {
         await AsyncStorage.setItem("USER_EMAIL", String(email));
         await AsyncStorage.setItem(KEY_ACTIVE_EMAIL, String(email));
@@ -174,11 +191,21 @@ async function readJoined(email: string): Promise<Set<string>> {
     return new Set();
   }
 }
+async function readBudgetMap(
+  email: string
+): Promise<Record<string, CategoryBudget>> {
+  try {
+    const raw = await AsyncStorage.getItem(KEY_TRIP_BUDGET_MAP(email));
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
 
 /* ---------- API: availability periods ---------- */
 type ServerPeriod = {
-  start_date: string; // "YYYY-MM-DD"
-  end_date: string;   // "YYYY-MM-DD"
+  start_date: string;
+  end_date: string;
   member_count?: number;
 };
 
@@ -191,7 +218,6 @@ async function apiGeneratePeriods(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // ตาม Swagger: body เดียวมีสองพารามิเตอร์
       body: JSON.stringify({
         min_days: opts?.min_days ?? 1,
         min_availability_member: opts?.min_availability_member ?? 1,
@@ -202,7 +228,6 @@ async function apiGeneratePeriods(
     const t = await res.text().catch(() => "");
     throw new Error(`Generate failed (${res.status}) ${t}`);
   }
-  // server persist เอง
 }
 
 async function apiGetAvailablePeriods(tripId: string): Promise<ServerPeriod[]> {
@@ -214,7 +239,11 @@ async function apiGetAvailablePeriods(tripId: string): Promise<ServerPeriod[]> {
     throw new Error(`Fetch periods failed (${res.status}) ${t}`);
   }
   const js = await res.json().catch(() => ({}));
-  const arr: any[] = Array.isArray(js) ? js : Array.isArray(js?.periods) ? js.periods : [];
+  const arr: any[] = Array.isArray(js)
+    ? js
+    : Array.isArray(js?.periods)
+    ? js.periods
+    : [];
   return arr
     .map((p) => ({
       start_date: p.start_date ?? p.startDate ?? p.start ?? p.from,
@@ -224,7 +253,6 @@ async function apiGetAvailablePeriods(tripId: string): Promise<ServerPeriod[]> {
     .filter((p) => p.start_date && p.end_date);
 }
 
-/* ช่วยแปลงช่วง start-end -> list รายวัน (ใช้กับ UI chips) */
 function expandDays(startYmd: string, endYmd: string) {
   const days: string[] = [];
   let cur = startYmd;
@@ -233,6 +261,42 @@ function expandDays(startYmd: string, endYmd: string) {
     cur = addDays(cur, 1);
   }
   return days;
+}
+
+/* ---------- NEW: API get budget for trip ---------- */
+async function apiGetTripBudget(
+  tripId: string
+): Promise<CategoryBudget | undefined> {
+  try {
+    const res = await fetchWithAuth(
+      `${BASE_URL}/api/trips/${encodeURIComponent(tripId)}/budget`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      console.warn("Fetch budget failed", res.status, t);
+      return undefined;
+    }
+
+    const js = await res.json().catch(() => ({} as any));
+    const b = js?.budget ?? js;
+    if (!b) return undefined;
+
+    return {
+      hotel: Number(b.hotel ?? 0) || 0,
+      food: Number(b.food ?? 0) || 0,
+      shopping: Number(b.shopping ?? 0) || 0,
+      transport: Number(b.transport ?? 0) || 0,
+      total: Number(b.total ?? 0) || 0,
+    };
+  } catch (e) {
+    console.warn("Fetch budget error", e);
+    return undefined;
+  }
 }
 
 /* ---------- Type guard & normalizer ---------- */
@@ -244,7 +308,7 @@ function normalizeTrips(js: any): ApiTrip[] {
   return arr.map((t: any) => ({ ...t, id: String(t?.id ?? "") })).filter(isApiTrip);
 }
 
-/* ---------- Small Card (ใช้กับทุกแท็บ) ---------- */
+/* ---------- Card ---------- */
 function SuggestCard({
   item,
   busy,
@@ -335,7 +399,7 @@ function BottomBar() {
   );
 }
 
-/* ---------- Free Day heuristic mock (fallback) ---------- */
+/* ---------- Fallback heuristic ---------- */
 function buildTopOptions(
   availability: AvailabilityByUser,
   { minGroupSize = 2, minStreak = 3 }: { minGroupSize?: number; minStreak?: number } = {}
@@ -376,7 +440,7 @@ function buildTopOptions(
   return ranges.slice(0, 3);
 }
 
-/* ---------- Mock availability (fallback เมื่อ error) ---------- */
+/* ---------- Mock availability (fallback) ---------- */
 async function loadAvailabilityForTrip(_tripId: string): Promise<AvailabilityByUser> {
   const base = "2025-12-02";
   const d = (n: number) => addDays(base, n);
@@ -388,150 +452,165 @@ async function loadAvailabilityForTrip(_tripId: string): Promise<AvailabilityByU
   };
 }
 
-/* ---------- Suggest DB (mock) ---------- */
-type SuggestBlock = {
-  when: "Morning" | "Afternoon" | "Evening";
-  category: string;
-  photo: any;
-  places: Array<{ name: string; note?: string }>;
-};
-const SUGGEST_DB: Record<string, SuggestBlock[]> = {
-  tokyo: [
-    {
-      when: "Morning",
-      category: "Shrine / Park",
-      photo: require("../../assets/images/japan.png"),
-      places: [
-        { name: "Meiji Jingu (Shinto shrine in Tokyo)" },
-        { name: "Yoyogi Park (Liveliest park in Tokyo)" },
-      ],
-    },
-    {
-      when: "Afternoon",
-      category: "Shopping & Cafe",
-      photo: require("../../assets/images/chinese.png"),
-      places: [{ name: "Takeshita Street (Harajuku fashion & sweets)" }, { name: "Omotesando" }],
-    },
-    {
-      when: "Evening",
-      category: "Festival / Dinner",
-      photo: require("../../assets/images/japan.png"),
-      places: [
-        { name: "!! Highlight !! : 47 Ronin Festival", note: "(only on 14 Dec)" },
-        { name: "Kaiten Wanko Soba", note: "Kurukuru Wanko" },
-      ],
-    },
-  ],
-  bangkok: [
-    {
-      when: "Morning",
-      category: "Temple & Park",
-      photo: require("../../assets/images/bkk.png"),
-      places: [{ name: "Wat Arun" }, { name: "Benjakitti Forest Park" }],
-    },
-    {
-      when: "Afternoon",
-      category: "Shopping & Cafe",
-      photo: require("../../assets/images/bkk.png"),
-      places: [{ name: "ICONSIAM" }, { name: "Ari cafe hopping" }],
-    },
-    {
-      when: "Evening",
-      category: "Street Food / Night",
-      photo: require("../../assets/images/bkk.png"),
-      places: [{ name: "Yaowarat Night Street Food" }, { name: "Asiatique Riverfront" }],
-    },
-  ],
-};
-function cityKeyOf(title: string, dest: string) {
-  const s = `${title} ${dest}`.toLowerCase();
-  if (s.includes("tokyo") || s.includes("japan")) return "tokyo";
-  if (s.includes("bkk") || s.includes("bangkok") || s.includes("thai")) return "bangkok";
-  return "tokyo";
-}
-
 /* ---------- Page ---------- */
 export default function FreeDayPage() {
   const insets = useSafeAreaInsets();
-  const padTop = Math.max(insets.top, Platform.OS === "android" ? StatusBar.currentHeight ?? 0 : 0);
+  const padTop = Math.max(
+    insets.top,
+    Platform.OS === "android" ? StatusBar.currentHeight ?? 0 : 0
+  );
 
   const [tab, setTab] = useState<"free" | "budget" | "suggest">("free");
   const [items, setItems] = useState<FreeDayItem[]>([]);
   const [email, setEmail] = useState<string>("");
 
-  // ===== Modal: Free Day (options) =====
+  // result modal
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTitle, setModalTitle] = useState("");
-  const [options, setOptions] = useState<Array<{ days: string[]; _meta?: any }>>([]);
+  const [options, setOptions] = useState<
+    Array<{ days: string[]; _meta?: any }>
+  >([]);
 
-  // ===== Modal: Budget =====
+  // budget modal
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [budgetTripTitle, setBudgetTripTitle] = useState("");
   const [budgetTotal, setBudgetTotal] = useState(0);
-  const [budget, setBudget] = useState({ hotel: 0, food: 0, shopping: 0, transport: 0 });
+  const [budget, setBudget] = useState({
+    hotel: 0,
+    food: 0,
+    shopping: 0,
+    transport: 0,
+  });
   const DEFAULT_RATIOS = { hotel: 0.44, food: 0.29, shopping: 0.15, transport: 0.12 };
 
-  // ===== Modal: Suggest =====
+  // suggest modal
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [suggestTitle, setSuggestTitle] = useState("");
-  const [suggestBlocks, setSuggestBlocks] = useState<SuggestBlock[]>([]);
 
-  // ===== ป้องกันกด Generate ซ้ำ =====
+  // config generate modal
+  const [configOpen, setConfigOpen] = useState(false);
+  const [configTrip, setConfigTrip] = useState<FreeDayItem | null>(null);
+  const [configMinDays, setConfigMinDays] = useState("3");
+  const [configMinMembers, setConfigMinMembers] = useState("2");
+
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const GENERATE_DEFAULTS = { min_days: 3, min_availability_member: 2 };
 
-  // ===== Load trips (Published + Draft) & de-dupe (per-user + joined only) =====
+  /* ---------- Load trips ---------- */
   useEffect(() => {
     (async () => {
       try {
         const e = await getActiveEmail();
         setEmail(e);
 
-        const [hiddenIds, coverMap, drafts, joined] = await Promise.all([
-          readHidden(e),
-          readCoverMap(e),
-          readDrafts(e),
-          readJoined(e),
-        ]);
+        const [hiddenIds, coverMap, drafts, joined, budgetMapLocal] =
+          await Promise.all([
+            readHidden(e),
+            readCoverMap(e),
+            readDrafts(e),
+            readJoined(e),
+            readBudgetMap(e),
+          ]);
 
-        // fetch published
         let published: ApiTrip[] = [];
         try {
-          const res = await fetchWithAuth(`${BASE_URL}/api/trips?status=published&limit=100&offset=0`);
+          const res = await fetchWithAuth(
+            `${BASE_URL}/api/trips?status=published&limit=100&offset=0`
+          );
           const js = await res.json().catch(() => ({}));
           published = normalizeTrips(js);
         } catch {}
 
-        // กรอง published ด้วย hidden + joined (เฉพาะของผู้ใช้)
-        const publishedVisible = published.filter((t) => !hiddenIds.includes(t.id) && joined.has(t.id));
+        const publishedVisible = published.filter(
+          (t) => !hiddenIds.includes(t.id) && joined.has(t.id)
+        );
 
-        const pubItems: FreeDayItem[] = publishedVisible.map((t) => ({
-          id: t.id,
-          originId: t.id,
-          title: t.name,
-          destination: t.destination,
-          cover: coverMap[t.id] ? { uri: coverMap[t.id] } : null,
-          totalBudget: t.total_budget,
-          budget: bandFromBudget(t.total_budget),
-          source: "published",
-        }));
+        // --- ดึง budget จาก API สำหรับแต่ละ published trip ---
+        const apiBudgetMap: Record<string, CategoryBudget> = {};
+        try {
+          const pairs = await Promise.all(
+            publishedVisible.map(async (t) => {
+              const b = await apiGetTripBudget(t.id);
+              return [t.id, b] as const;
+            })
+          );
+          pairs.forEach(([id, b]) => {
+            if (b) apiBudgetMap[id] = b;
+          });
+        } catch (err) {
+          console.warn("Load budgets for trips failed", err);
+        }
 
-        const draftItems: FreeDayItem[] = drafts.map((d) => ({
-          id: d.id,
-          originId: d.sourceId || undefined,
-          title: d.title,
-          destination: d.destination,
-          cover: d.coverUri ? { uri: d.coverUri } : null,
-          totalBudget: d.total_budget,
-          budget: bandFromBudget(d.total_budget),
-          source: "draft",
-        }));
+        const pubItems: FreeDayItem[] = publishedVisible.map((t) => {
+          // ใช้ budget local ก่อน ถ้าไม่มีค่อย fallback API
+          const localBudget = budgetMapLocal[t.id];
+          const apiBudget = apiBudgetMap[t.id];
+          const categoryBudget = localBudget || apiBudget;
 
-        const merged = [...pubItems, ...draftItems];
+          let totalBudget: number | undefined = t.total_budget;
+          if (categoryBudget) {
+            const totalFromCat =
+              (categoryBudget.hotel ?? 0) +
+              (categoryBudget.food ?? 0) +
+              (categoryBudget.shopping ?? 0) +
+              (categoryBudget.transport ?? 0);
+            const totalFromApi = categoryBudget.total ?? 0;
+            const picked = totalFromCat || totalFromApi;
+            if (picked > 0) totalBudget = picked;
+          }
+
+          return {
+            id: t.id,
+            originId: t.id,
+            title: t.name,
+            destination: t.destination,
+            cover: coverMap[t.id] ? { uri: coverMap[t.id] } : null,
+            totalBudget,
+            budget: bandFromBudget(totalBudget),
+            source: "published",
+            categoryBudget,
+          };
+        });
+
+        // ยังอ่าน draft ไว้ แต่ไม่เอาเข้า merged แล้ว
+        const draftItems: FreeDayItem[] = drafts.map((d) => {
+          const keyForBudget = d.sourceId || d.id;
+          const catBudget = keyForBudget ? budgetMapLocal[keyForBudget] : undefined;
+
+          let totalBudget: number | undefined = d.total_budget;
+          if (catBudget) {
+            const totalFromCat =
+              (catBudget.hotel ?? 0) +
+              (catBudget.food ?? 0) +
+              (catBudget.shopping ?? 0) +
+              (catBudget.transport ?? 0);
+            const totalFromApi = catBudget.total ?? 0;
+            const picked = totalFromCat || totalFromApi;
+            if (picked > 0) totalBudget = picked;
+          }
+
+          return {
+            id: d.id,
+            originId: d.sourceId || undefined,
+            title: d.title,
+            destination: d.destination,
+            cover: d.coverUri ? { uri: d.coverUri } : null,
+            totalBudget,
+            budget: bandFromBudget(totalBudget),
+            source: "draft",
+            categoryBudget: catBudget,
+          } as FreeDayItem;
+        });
+
+        // ❗ ใช้เฉพาะ published ใน FreeDay
+        const merged = [...pubItems];
+
         const seen = new Set<string>();
         const uniq: FreeDayItem[] = [];
         merged
-          .sort((a, b) => (a.source === "draft" && b.source === "published" ? -1 : 1))
+          .sort((a, b) =>
+            a.source === "draft" && b.source === "published" ? -1 : 1
+          )
           .forEach((it) => {
             const key = it.originId ? `origin:${it.originId}` : `id:${it.id}`;
             if (seen.has(key)) return;
@@ -540,17 +619,107 @@ export default function FreeDayPage() {
           });
 
         setItems(uniq);
-      } catch {
+      } catch (err) {
+        console.warn("Load FreeDay items failed", err);
         setItems([]);
       }
     })();
   }, []);
 
-  const freeGridList = useMemo(() => items, [items]);
+  // ✅ ทุก tab เห็นเฉพาะ published
+  const freeGridList = useMemo(
+    () => items.filter((it) => it.source === "published"),
+    [items]
+  );
 
-  /* ---------- เมื่อกด Generate ---------- */
+  /* ---------- Confirm generate after config ---------- */
+  const confirmGenerateForTrip = async () => {
+    if (!configTrip) return;
+    const tripId = configTrip.originId || configTrip.id;
+
+    const minDays = Number(configMinDays || "1") || 1;
+    const minMembers = Number(configMinMembers || "1") || 1;
+
+    try {
+      setGeneratingId(tripId);
+
+      await apiGeneratePeriods(tripId, {
+        min_days: minDays,
+        min_availability_member: minMembers,
+      });
+
+      const periods = await apiGetAvailablePeriods(tripId);
+
+      const opts = periods.map((p) => ({
+        days: expandDays(p.start_date, p.end_date),
+        _meta: {
+          memberCount: p.member_count ?? 0,
+          start: p.start_date,
+          end: p.end_date,
+        },
+      }));
+
+      setConfigOpen(false);
+      setModalTitle(configTrip.title);
+      setOptions(opts);
+      setModalOpen(true);
+    } catch (e: any) {
+      console.warn(e?.message || e);
+
+      try {
+        const availability = await loadAvailabilityForTrip(tripId);
+        const top = buildTopOptions(availability, {
+          minGroupSize: 2,
+          minStreak: 3,
+        });
+        setConfigOpen(false);
+        setModalTitle(configTrip.title);
+        setOptions(top.map((r) => ({ days: r.days })));
+        setModalOpen(true);
+      } catch {
+        setConfigOpen(false);
+        setModalTitle("Generate failed");
+        setOptions([]);
+        setModalOpen(true);
+      }
+    } finally {
+      setGeneratingId(null);
+    }
+  };
+
+  /* ---------- When press Generate on card ---------- */
   const handleGenerate = async (item: FreeDayItem) => {
     if (tab === "budget") {
+      const cat = item.categoryBudget;
+
+      if (cat) {
+        let hotel = Number(cat.hotel ?? 0) || 0;
+        let food = Number(cat.food ?? 0) || 0;
+        let shopping = Number(cat.shopping ?? 0) || 0;
+        let transport = Number(cat.transport ?? 0) || 0;
+
+        let total =
+          (cat.total ?? 0) || hotel + food + shopping + transport;
+
+        // ถ้าเจอว่า budget กระจุกตัวหมวดเดียว (หมวดเดียว = total, ที่เหลือ 0)
+        // ให้กระจายเท่า ๆ กันทุกหมวด
+        const arr = [hotel, food, shopping, transport];
+        const nonZero = arr.filter((v) => v > 0);
+        if (total > 0 && nonZero.length === 1 && nonZero[0] === total) {
+          const per = Math.round(total / 4);
+          hotel = per;
+          food = per;
+          shopping = per;
+          transport = per;
+        }
+
+        setBudgetTripTitle(item.title);
+        setBudgetTotal(total);
+        setBudget({ hotel, food, shopping, transport });
+        setBudgetOpen(true);
+        return;
+      }
+
       const total = item.totalBudget ?? 35000;
       const b = {
         hotel: Math.round(total * DEFAULT_RATIOS.hotel),
@@ -566,82 +735,76 @@ export default function FreeDayPage() {
     }
 
     if (tab === "suggest") {
-      const key = cityKeyOf(item.title, item.destination);
-      const blocks = SUGGEST_DB[key] ?? SUGGEST_DB["tokyo"];
+      // static suggest text
       setSuggestTitle(`Suggest ${item.title}`);
-      setSuggestBlocks(blocks);
       setSuggestOpen(true);
       return;
     }
 
-    // ===== Free Day options (เรียก API จริง; fallback เป็น mock ถ้า error) =====
-    const tripId = item.originId || item.id;
-
-    try {
-      setGeneratingId(tripId);
-
-      // 1) ให้แบ็กเอนด์คำนวณและ persist
-      await apiGeneratePeriods(tripId, GENERATE_DEFAULTS);
-
-      // 2) ดึงช่วงที่บันทึกไว้
-      const periods = await apiGetAvailablePeriods(tripId);
-
-      // 3) map เป็น { days: string[] } ให้ใช้ UI เดิมได้เลย
-      const opts = periods.map((p) => ({
-        days: expandDays(p.start_date, p.end_date),
-        _meta: {
-          memberCount: p.member_count ?? 0,
-          start: p.start_date,
-          end: p.end_date,
-        },
-      }));
-
-      setModalTitle(item.title);
-      setOptions(opts);
-      setModalOpen(true);
-    } catch (e: any) {
-      console.warn(e?.message || e);
-      // fallback: mock
-      try {
-        const availability = await loadAvailabilityForTrip(tripId);
-        const top = buildTopOptions(availability, { minGroupSize: 2, minStreak: 3 });
-        setModalTitle(item.title);
-        setOptions(top.map((r) => ({ days: r.days })));
-        setModalOpen(true);
-      } catch {
-        setModalTitle("Generate failed");
-        setOptions([]);
-        setModalOpen(true);
-      }
-    } finally {
-      setGeneratingId(null);
-    }
+    // tab free day -> open config
+    setConfigTrip(item);
+    setConfigMinDays(String(GENERATE_DEFAULTS.min_days));
+    setConfigMinMembers(String(GENERATE_DEFAULTS.min_availability_member));
+    setConfigOpen(true);
+    setGeneratingId(null);
   };
 
   return (
     <View style={styles.page}>
-      {/* Top Light Blue Area */}
+      {/* Hero */}
       <View style={[styles.heroTop, { paddingTop: padTop + 16 }]}>
-        <Text style={styles.heroHeading}>GET READY{"\n"}FOR FREE DAY</Text>
+        <Text style={styles.heroHeading}>
+          GET READY{"\n"}FOR FREE DAY
+        </Text>
 
-        {/* Tabs */}
         <View style={styles.tabsRow}>
-          <Pressable onPress={() => setTab("free")} style={[styles.tabBtn, tab === "free" && styles.tabBtnActive]}>
-            <Text style={[styles.tabText, tab === "free" && styles.tabTextActive]}>Free Day</Text>
+          <Pressable
+            onPress={() => setTab("free")}
+            style={[styles.tabBtn, tab === "free" && styles.tabBtnActive]}
+          >
+            <Text style={[styles.tabText, tab === "free" && styles.tabTextActive]}>
+              Free Day
+            </Text>
           </Pressable>
-          <Pressable onPress={() => setTab("budget")} style={[styles.tabBtn, tab === "budget" && styles.tabBtnActive]}>
-            <Text style={[styles.tabText, tab === "budget" && styles.tabTextActive]}>Budget Trip</Text>
+          <Pressable
+            onPress={() => setTab("budget")}
+            style={[styles.tabBtn, tab === "budget" && styles.tabBtnActive]}
+          >
+            <Text
+              style={[styles.tabText, tab === "budget" && styles.tabTextActive]}
+            >
+              Budget Trip
+            </Text>
           </Pressable>
-          <Pressable onPress={() => setTab("suggest")} style={[styles.tabBtn, tab === "suggest" && styles.tabBtnActive]}>
-            <Text style={[styles.tabText, tab === "suggest" && styles.tabTextActive]}>Suggest</Text>
+          <Pressable
+            onPress={() => setTab("suggest")}
+            style={[styles.tabBtn, tab === "suggest" && styles.tabBtnActive]}
+          >
+            <Text
+              style={[styles.tabText, tab === "suggest" && styles.tabTextActive]}
+            >
+              Suggest
+            </Text>
           </Pressable>
         </View>
       </View>
 
-      {/* Content List */}
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 16, paddingBottom: 120 }}>
+      {/* Content */}
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 18,
+          paddingTop: 16,
+          paddingBottom: 120,
+        }}
+      >
         {freeGridList.length === 0 ? (
-          <View style={{ alignItems: "center", justifyContent: "center", paddingTop: 24 }}>
+          <View
+            style={{
+              alignItems: "center",
+              justifyContent: "center",
+              paddingTop: 24,
+            }}
+          >
             <Ionicons name="calendar-outline" size={28} color="#97A6B1" />
             <Text style={{ marginTop: 8, color: "#97A6B1" }}>
               You don’t have any trips yet.
@@ -680,16 +843,110 @@ export default function FreeDayPage() {
         )}
       </ScrollView>
 
-      {/* Modal: Free Day Options */}
-      <Modal visible={modalOpen} transparent animationType="fade" onRequestClose={() => setModalOpen(false)}>
+      {/* Modal: Generate config */}
+      <Modal
+        visible={configOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfigOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Generate Free Day</Text>
+            <Text style={styles.modalSub}>
+              {configTrip ? configTrip.title : ""}
+            </Text>
+
+            <View style={{ marginTop: 16, rowGap: 12 }}>
+              <View>
+                <Text
+                  style={{ fontSize: 13, color: "#4B5563", marginBottom: 4 }}
+                >
+                  Minimum days for a period
+                </Text>
+                <TextInput
+                  style={[styles.input, { height: 44 }]}
+                  keyboardType="numeric"
+                  value={configMinDays}
+                  onChangeText={(v) => setConfigMinDays(v.replace(/[^\d]/g, ""))}
+                  placeholder="e.g. 3"
+                />
+              </View>
+
+              <View>
+                <Text
+                  style={{ fontSize: 13, color: "#4B5563", marginBottom: 4 }}
+                >
+                  Minimum available members
+                </Text>
+                <TextInput
+                  style={[styles.input, { height: 44 }]}
+                  keyboardType="numeric"
+                  value={configMinMembers}
+                  onChangeText={(v) =>
+                    setConfigMinMembers(v.replace(/[^\d]/g, ""))
+                  }
+                  placeholder="e.g. 2"
+                />
+              </View>
+            </View>
+
+            <View
+              style={[
+                styles.modalBtns,
+                {
+                  flexDirection: "row",
+                  justifyContent: "flex-end",
+                  columnGap: 8,
+                },
+              ]}
+            >
+              <Pressable
+                style={styles.modalBtnGhost}
+                onPress={() => setConfigOpen(false)}
+              >
+                <Text style={styles.modalBtnGhostText}>Cancel</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.modalBtnPrimary}
+                onPress={confirmGenerateForTrip}
+                disabled={
+                  !configTrip ||
+                  generatingId === (configTrip.originId || configTrip.id)
+                }
+              >
+                <Text style={styles.modalBtnPrimaryText}>
+                  {configTrip &&
+                  generatingId === (configTrip.originId || configTrip.id)
+                    ? "Generating..."
+                    : "Generate"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal: Free Day options result */}
+      <Modal
+        visible={modalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalOpen(false)}
+      >
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>{modalTitle}</Text>
-            <Text style={styles.modalSub}>All of option its generate for your group FREE DAY</Text>
+            <Text style={styles.modalSub}>
+              All of option its generate for your group FREE DAY
+            </Text>
 
             <View style={styles.optionsWrap}>
               {options.length === 0 ? (
-                <Text style={styles.noOptionText}>No overlapping dates found.</Text>
+                <Text style={styles.noOptionText}>
+                  No overlapping dates found.
+                </Text>
               ) : (
                 options.map((op, idx) => (
                   <View key={idx} style={styles.optionRow}>
@@ -710,35 +967,12 @@ export default function FreeDayPage() {
                       <View style={styles.chipsRow}>
                         {op.days.map((d) => (
                           <View key={d} style={styles.dateChip}>
-                            <Text style={styles.dateChipText}>{formatChip(d)}</Text>
+                            <Text style={styles.dateChipText}>
+                              {formatChip(d)}
+                            </Text>
                           </View>
                         ))}
                       </View>
-
-                      <Pressable
-                        style={[styles.generateBtn, { marginTop: 8 }]}
-                        onPress={() => {
-                          const daysCount = op.days.length;
-                          const base = items.find((it) => it.title === modalTitle);
-                          const total = base?.totalBudget ?? 35000;
-                          const perDay = Math.max(1, Math.round(total / 5)); // fallback baseline
-                          const periodBudget = perDay * daysCount;
-
-                          setBudgetTripTitle(`${modalTitle} (${daysCount} days)`);
-                          setBudgetTotal(periodBudget);
-                          setBudget({
-                            hotel: Math.round(periodBudget * 0.44),
-                            food: Math.round(periodBudget * 0.29),
-                            shopping: Math.round(periodBudget * 0.15),
-                            transport: Math.round(periodBudget * 0.12),
-                          });
-
-                          setModalOpen(false);
-                          setBudgetOpen(true);
-                        }}
-                      >
-                        <Text style={styles.generateText}>Select</Text>
-                      </Pressable>
                     </View>
                   </View>
                 ))
@@ -746,7 +980,10 @@ export default function FreeDayPage() {
             </View>
 
             <View style={styles.modalBtns}>
-              <Pressable style={styles.modalBtnGhost} onPress={() => setModalOpen(false)}>
+              <Pressable
+                style={styles.modalBtnGhost}
+                onPress={() => setModalOpen(false)}
+              >
                 <Text style={styles.modalBtnGhostText}>Close</Text>
               </Pressable>
             </View>
@@ -755,11 +992,18 @@ export default function FreeDayPage() {
       </Modal>
 
       {/* Modal: Budget */}
-      <Modal visible={budgetOpen} transparent animationType="fade" onRequestClose={() => setBudgetOpen(false)}>
+      <Modal
+        visible={budgetOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBudgetOpen(false)}
+      >
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>{budgetTripTitle}</Text>
-            <Text style={styles.modalSub}>Average budget suggestion for this trip</Text>
+            <Text style={styles.modalSub}>
+              Average budget suggestion for this trip
+            </Text>
 
             <View style={[styles.totalCard, { marginTop: 12 }]}>
               <View style={styles.totalRow}>
@@ -775,54 +1019,57 @@ export default function FreeDayPage() {
               <View style={styles.budgetCard}>
                 <View style={styles.budgetCardHeader}>
                   <Text style={styles.budgetTitle}>Hotel</Text>
-                  <Ionicons name="storefront-outline" size={20} color={COLORS.cardIcon} />
+                  <Ionicons
+                    name="storefront-outline"
+                    size={20}
+                    color={COLORS.cardIcon}
+                  />
                 </View>
                 <Text style={styles.budgetAmount}>{THB(budget.hotel)}</Text>
-                <View style={styles.progressTrack}>
-                  <View style={[styles.progressBar, { width: "80%" }]} />
-                </View>
-                <Text style={styles.budgetRemaining}>Remaining: {THB(Math.round(budget.hotel * 0.72))}</Text>
               </View>
 
               <View style={styles.budgetCard}>
                 <View style={styles.budgetCardHeader}>
                   <Text style={styles.budgetTitle}>Food</Text>
-                  <Ionicons name="restaurant-outline" size={20} color={COLORS.cardIcon} />
+                  <Ionicons
+                    name="restaurant-outline"
+                    size={20}
+                    color={COLORS.cardIcon}
+                  />
                 </View>
                 <Text style={styles.budgetAmount}>{THB(budget.food)}</Text>
-                <View style={styles.progressTrack}>
-                  <View style={[styles.progressBar, { width: "70%" }]} />
-                </View>
-                <Text style={styles.budgetRemaining}>Remaining: {THB(Math.round(budget.food * 0.88))}</Text>
               </View>
 
               <View style={styles.budgetCard}>
                 <View style={styles.budgetCardHeader}>
                   <Text style={styles.budgetTitle}>Shopping</Text>
-                  <Ionicons name="bag-outline" size={20} color={COLORS.cardIcon} />
+                  <Ionicons
+                    name="bag-outline"
+                    size={20}
+                    color={COLORS.cardIcon}
+                  />
                 </View>
                 <Text style={styles.budgetAmount}>{THB(budget.shopping)}</Text>
-                <View style={styles.progressTrack}>
-                  <View style={[styles.progressBar, { width: "60%" }]} />
-                </View>
-                <Text style={styles.budgetRemaining}>Remaining: {THB(Math.round(budget.shopping * 0.83))}</Text>
               </View>
 
               <View style={styles.budgetCard}>
                 <View style={styles.budgetCardHeader}>
                   <Text style={styles.budgetTitle}>Transport</Text>
-                  <Ionicons name="train-outline" size={20} color={COLORS.cardIcon} />
+                  <Ionicons
+                    name="train-outline"
+                    size={20}
+                    color={COLORS.cardIcon}
+                  />
                 </View>
                 <Text style={styles.budgetAmount}>{THB(budget.transport)}</Text>
-                <View style={styles.progressTrack}>
-                  <View style={[styles.progressBar, { width: "55%" }]} />
-                </View>
-                <Text style={styles.budgetRemaining}>Remaining: {THB(Math.round(budget.transport * 0.76))}</Text>
               </View>
             </View>
 
             <View style={styles.modalBtns}>
-              <Pressable style={styles.modalBtnGhost} onPress={() => setBudgetOpen(false)}>
+              <Pressable
+                style={styles.modalBtnGhost}
+                onPress={() => setBudgetOpen(false)}
+              >
                 <Text style={styles.modalBtnGhostText}>Close</Text>
               </Pressable>
             </View>
@@ -830,40 +1077,54 @@ export default function FreeDayPage() {
         </View>
       </Modal>
 
-      {/* Modal: Suggest (Morning / Afternoon / Evening) */}
-      <Modal visible={suggestOpen} transparent animationType="fade" onRequestClose={() => setSuggestOpen(false)}>
+      {/* Modal: Suggest (simple static text) */}
+      <Modal
+        visible={suggestOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSuggestOpen(false)}
+      >
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>{suggestTitle}</Text>
-            <Text style={styles.modalSub}>Auto-suggested places based on your destination</Text>
+            <Text style={styles.modalSub}>
+              Simple suggestion for how to spend your free day
+            </Text>
 
-            <View style={{ gap: 14 }}>
-              {suggestBlocks.map((b, idx) => (
-                <View key={idx} style={styles.sugRow}>
-                  <Image source={b.photo} style={styles.sugPhoto} contentFit="cover" />
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.sugHeader}>
-                      <Text style={styles.sugCat}>{b.category}</Text>
-                      <Text style={styles.sugWhen}>{b.when}</Text>
-                    </View>
-                    <View style={{ marginTop: 6, gap: 6 }}>
-                      {b.places.map((p, i) => (
-                        <View key={i} style={styles.dotRow}>
-                          <View style={styles.dot} />
-                          <Text style={styles.placeText}>
-                            {p.name}
-                            {p.note ? ` ${p.note}` : ""}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                </View>
-              ))}
+            <View style={{ marginTop: 8 }}>
+              {/* Morning */}
+              <View style={styles.sugBlock}>
+                <Text style={styles.sugWhen}>Morning</Text>
+                <Text style={[styles.placeText, { marginTop: 6 }]}>
+                  - Eat Breakfast{"\n"}
+                  - Go to the park
+                </Text>
+              </View>
+
+              {/* Afternoon */}
+              <View style={styles.sugBlock}>
+                <Text style={styles.sugWhen}>Afternoon</Text>
+                <Text style={[styles.placeText, { marginTop: 6 }]}>
+                  - Go shopping (Fashion street){"\n"}
+                  - Cafe / Lunch
+                </Text>
+              </View>
+
+              {/* Evening */}
+              <View style={styles.sugBlock}>
+                <Text style={styles.sugWhen}>Evening</Text>
+                <Text style={[styles.placeText, { marginTop: 6 }]}>
+                  - Free Time / Take a rest{"\n"}
+                  - Night Marget
+                </Text>
+              </View>
             </View>
 
             <View style={styles.modalBtns}>
-              <Pressable style={styles.modalBtnGhost} onPress={() => setSuggestOpen(false)}>
+              <Pressable
+                style={styles.modalBtnGhost}
+                onPress={() => setSuggestOpen(false)}
+              >
                 <Text style={styles.modalBtnGhostText}>Close</Text>
               </Pressable>
             </View>

@@ -58,6 +58,7 @@ type DraftTrip = {
   startDate: string;
   endDate: string;
   coverUri?: string;
+  total_budget?: number; // 👈 เก็บงบรวมไว้ด้วย
 };
 
 function fmt(d: string) {
@@ -78,8 +79,12 @@ const KEY_JOINED_TRIPS = (email: string) => keyScoped(email, "JOINED_TRIPS");
 const KEY_INVITE_LINK_MAP = (email: string) => keyScoped(email, "INVITE_LINK_MAP");
 const KEY_TRIP_DRAFTS = (email: string) => keyScoped(email, "TRIP_DRAFTS");
 const KEY_ACTIVE_EMAIL = "ACTIVE_EMAIL";
-const KEY_ACTIVE_USER_ID = "ACTIVE_USER_ID"; // 👈 cache user id
+const KEY_ACTIVE_USER_ID = "ACTIVE_USER_ID";
 const KEY_OWN_TRIP_IDS = (email: string) => keyScoped(email, "OWN_TRIP_IDS");
+
+// 👇 budget + people map (ใช้ร่วมกับ BuildMyTrip / FreeDay)
+const KEY_TRIP_BUDGET_MAP = (email: string) => keyScoped(email, "TRIP_BUDGET_MAP");
+const KEY_TRIP_PEOPLE_MAP = (email: string) => keyScoped(email, "TRIP_PEOPLE_MAP");
 
 /* ---------- Auth helpers ---------- */
 async function fetchWithAuth(path: string, init?: RequestInit) {
@@ -165,6 +170,9 @@ async function readDrafts(email: string): Promise<DraftTrip[]> {
       endDate: x.endDate ?? x.end_date ?? "",
       destination: x.destination ?? "",
       coverUri: x.coverUri ?? x.cover_uri ?? undefined,
+      total_budget: Number(
+        x.total_budget ?? x.totalBudget ?? x.total ?? 0
+      ), // 👈 ensure number
     })) as DraftTrip[];
   } catch (err) {
     dlog("readDrafts error:", err);
@@ -187,6 +195,7 @@ function apiTripToDraft(t: ApiTrip): DraftTrip {
     destination: t.destination,
     startDate: t.start_date,
     endDate: t.end_date,
+    total_budget: t.total_budget, // 👈 ย้ายงบมาด้วย
   };
 }
 async function readHidden(email: string): Promise<string[]> {
@@ -422,19 +431,16 @@ export default function MyTripPage() {
       const joined = await readJoined(currentEmail);
       dlog("joined set:", Array.from(joined));
 
-      // user เห็นเฉพาะทริปที่ตัวเอง join อยู่
       const mine = all.filter((t) => joined.has(t.id));
       dlog("mine (joined && published):", mine.map((t) => t.id));
       setPublished(mine);
 
-      // debug keys
       const allKeys = (await AsyncStorage.getAllKeys()) || [];
       dlog(
         "All AS keys (filter CREATE_TRIP):",
         allKeys.filter((k) => k.includes("CREATE_TRIP"))
       );
 
-      // ---------- build ownTripIds ----------
       const storedOwn = await readOwnTripIds(currentEmail);
       const ownSet = new Set<string>(storedOwn);
       const myEmailLower = currentEmail.toLowerCase();
@@ -532,7 +538,10 @@ export default function MyTripPage() {
   /* ----- Actions ----- */
   const moveToDraft = async (t: ApiTrip) => {
     dlog("moveToDraft trip:", t.id);
-    const newDraft = { ...apiTripToDraft(t), coverUri: coverMap[t.id] };
+    const newDraft: DraftTrip = {
+      ...apiTripToDraft(t),
+      coverUri: coverMap[t.id],
+    };
     const nextDrafts = [...drafts, newDraft];
     await writeDrafts(email, nextDrafts);
     setDrafts(nextDrafts);
@@ -546,10 +555,95 @@ export default function MyTripPage() {
   };
 
   const publishDraft = async (d: DraftTrip) => {
-    dlog("publishDraft:", d.id);
+    dlog("publishDraft:", d.id, "total_budget:", d.total_budget, "sourceId:", d.sourceId);
+
+    // ✅ เคส 1: draft นี้มาจาก trip เดิมที่เคย published แล้ว (มี sourceId)
+    if (d.sourceId) {
+      const originalId = d.sourceId;
+
+      try {
+        // เอาทริปเดิมออกจาก hidden ให้กลับไปโผล่ใน Published
+        const nextHidden = hidden.filter((id) => id !== originalId);
+        await writeHidden(email, nextHidden);
+        setHidden(nextHidden);
+
+        // ลบ draft ตัวนี้ออกจาก local + state
+        const nextDrafts = drafts.filter((x) => x.id !== d.id);
+        await writeDrafts(email, nextDrafts);
+        setDrafts(nextDrafts);
+
+        // กันเหนียว: เพิ่ม original trip เข้า joined list
+        const joined = await readJoined(email);
+        joined.add(String(originalId));
+        await writeJoined(email, joined);
+
+        // กันเหนียว: mark original trip เป็น trip ของเราเอง
+        const own = await readOwnTripIds(email);
+        own.add(String(originalId));
+        await writeOwnTripIds(email, own);
+        setOwnTripIds(Array.from(own));
+
+        Alert.alert("Published", "Trip has been published.");
+        await fetchPublished(email);
+      } catch (err) {
+        dlog("publishDraft (from existing) error:", err);
+        Alert.alert("Error", "Cannot publish draft.");
+      }
+
+      // ไม่ต้องสร้าง trip ใหม่
+      return;
+    }
+
+    // ✅ เคส 2: draft ที่มาจาก BuildMyTrip (ยังไม่มี trip ใน backend) → ใช้ logic เดิม
     const token = await AsyncStorage.getItem("TOKEN");
     if (!token) return;
     try {
+      // ---- NEW: เตรียม payload budget จาก local map ถ้ามี ----
+      const userEmail = email || (await getActiveEmail());
+      const fromKey = d.sourceId || d.id;
+
+      let payloadBudget: {
+        hotel?: number;
+        food?: number;
+        shopping?: number;
+        transport?: number;
+        total_budget: number;
+      } = { total_budget: 0 };
+
+      try {
+        const rawBudget = await AsyncStorage.getItem(KEY_TRIP_BUDGET_MAP(userEmail));
+        const budgetMap = rawBudget ? JSON.parse(rawBudget) : {};
+        const cat = budgetMap[fromKey];
+        dlog("publishDraft category budget for", fromKey, "=>", cat);
+
+        if (cat) {
+          const hotel = Number(cat.hotel ?? 0) || 0;
+          const food = Number(cat.food ?? 0) || 0;
+          const shopping = Number(cat.shopping ?? 0) || 0;
+          const transport = Number(cat.transport ?? 0) || 0;
+          const total_budget = hotel + food + shopping + transport;
+
+          payloadBudget = {
+            hotel,
+            food,
+            shopping,
+            transport,
+            total_budget,
+          };
+        } else {
+          const total_budget = Number.isFinite(Number(d.total_budget))
+            ? Number(d.total_budget)
+            : 0;
+          payloadBudget = { total_budget };
+        }
+      } catch (err) {
+        dlog("publishDraft read budget map error:", err);
+        const total_budget = Number.isFinite(Number(d.total_budget))
+          ? Number(d.total_budget)
+          : 0;
+        payloadBudget = { total_budget };
+      }
+
       const res = await fetch(`${BASE_URL}/api/trips`, {
         method: "POST",
         headers: {
@@ -563,6 +657,7 @@ export default function MyTripPage() {
           end_date: d.endDate,
           currency: "THB",
           status: "published",
+          ...payloadBudget, // 👈 ส่ง budget แยกหมวด + total_budget
         }),
       });
       dlog("publishDraft response status:", res.status);
@@ -572,6 +667,43 @@ export default function MyTripPage() {
 
       const newId = json?.trip?.id || json?.id;
       dlog("new trip id from draft:", newId);
+
+      // 👇 ย้าย budget + people map จาก trip เดิม (หรือ draft) ไปยัง trip ใหม่
+      if (newId) {
+        const userEmail2 = userEmail || (await getActiveEmail());
+        const fromKey2 = d.sourceId || d.id;
+
+        try {
+          const rawBudget = await AsyncStorage.getItem(KEY_TRIP_BUDGET_MAP(userEmail2));
+          const budgetMap = rawBudget ? JSON.parse(rawBudget) : {};
+          if (budgetMap[fromKey2]) {
+            budgetMap[newId] = budgetMap[fromKey2];
+            await AsyncStorage.setItem(
+              KEY_TRIP_BUDGET_MAP(userEmail2),
+              JSON.stringify(budgetMap)
+            );
+            dlog("moved budget map from", fromKey2, "to", newId);
+          }
+        } catch (err) {
+          dlog("publishDraft budget map error:", err);
+        }
+
+        try {
+          const rawPeople = await AsyncStorage.getItem(KEY_TRIP_PEOPLE_MAP(userEmail2));
+          const peopleMap = rawPeople ? JSON.parse(rawPeople) : {};
+          if (peopleMap[fromKey2]) {
+            peopleMap[newId] = peopleMap[fromKey2];
+            await AsyncStorage.setItem(
+              KEY_TRIP_PEOPLE_MAP(userEmail2),
+              JSON.stringify(peopleMap)
+            );
+            dlog("moved people map from", fromKey2, "to", newId);
+          }
+        } catch (err) {
+          dlog("publishDraft people map error:", err);
+        }
+      }
+      // 👆 end move budget + people
 
       if (newId && d.coverUri) {
         try {
