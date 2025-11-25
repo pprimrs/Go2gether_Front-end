@@ -34,7 +34,7 @@ The API URL is configured in `src/config/env.config.ts`:
 
 ```typescript
 // Development
-API_URL: 'https://undeclamatory-precollegiate-felicitas.ngrok-free.dev'
+API_URL: 'https://go2gether.vercel.app'
 
 // Production
 API_URL: 'https://api.go2gether.com'
@@ -45,7 +45,7 @@ API_URL: 'https://api.go2gether.com'
 Set these environment variables in your `.env` file:
 
 ```bash
-EXPO_PUBLIC_API_URL=https://undeclamatory-precollegiate-felicitas.ngrok-free.dev
+EXPO_PUBLIC_API_URL=https://go2gether.vercel.app
 EXPO_PUBLIC_GOOGLE_CLIENT_ID_DEV=your_google_client_id
 ```
 
@@ -232,7 +232,7 @@ Set `ENABLE_LOGS: true` in your environment configuration to see detailed API lo
 ### Development
 ```bash
 npm start
-# API_URL will be https://undeclamatory-precollegiate-felicitas.ngrok-free.dev
+# API_URL will be https://go2gether.vercel.app
 ```
 
 ### Production

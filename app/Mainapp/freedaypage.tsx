@@ -4,20 +4,20 @@ import { Image } from "expo-image";
 import { router, usePathname } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Alert,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  Text,
-  TextInput,
-  View,
+    Alert,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StatusBar,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS, styles } from "./styles/freedaystyles";
 
-const BASE_URL = "https://undeclamatory-precollegiate-felicitas.ngrok-free.dev";
+const BASE_URL = "https://go2gether.vercel.app";
 
 /* ---------- Types ---------- */
 type ApiTrip = {

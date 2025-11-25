@@ -6,20 +6,20 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { styles } from "./styles/viewdetailstyles";
 
-const BASE_URL = "https://undeclamatory-precollegiate-felicitas.ngrok-free.dev";
+const BASE_URL = "https://go2gether.vercel.app";
 
 /* ---------- DEBUG ---------- */
 const DEBUG_VIEW = true;

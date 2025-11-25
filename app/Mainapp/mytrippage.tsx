@@ -6,21 +6,21 @@ import { Image } from "expo-image";
 import { router, useFocusEffect, usePathname } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  Pressable,
-  RefreshControl,
-  Image as RNImage,
-  ScrollView,
-  StatusBar,
-  Text,
-  View,
+    ActivityIndicator,
+    Alert,
+    Platform,
+    Pressable,
+    RefreshControl,
+    Image as RNImage,
+    ScrollView,
+    StatusBar,
+    Text,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS, styles } from "./styles/mytripstyles";
 
-const BASE_URL = "https://undeclamatory-precollegiate-felicitas.ngrok-free.dev";
+const BASE_URL = "https://go2gether.vercel.app";
 
 /* ---------- DEBUG HELPERS ---------- */
 const DEBUG_TRIP = true;

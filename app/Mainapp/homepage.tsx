@@ -6,18 +6,18 @@ import { Image } from "expo-image";
 import { router, useFocusEffect, usePathname } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    Modal,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { styles } from "./styles/homepagestyles";
 
-const BASE_URL = "https://undeclamatory-precollegiate-felicitas.ngrok-free.dev";
+const BASE_URL = "https://go2gether.vercel.app";
 
 /* ---------- Types ---------- */
 type ApiTrip = {

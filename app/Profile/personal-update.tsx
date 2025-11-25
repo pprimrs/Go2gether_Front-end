@@ -50,7 +50,7 @@ export default function PersonalUpdateScreen() {
           }
           return;
         }
-        const res = await fetch("https://undeclamatory-precollegiate-felicitas.ngrok-free.dev/api/profile", {
+        const res = await fetch("https://go2gether.vercel.app/api/profile", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -154,7 +154,7 @@ export default function PersonalUpdateScreen() {
         // โดยทั่วไปฝั่ง update ไม่จำเป็นต้องส่ง ถ้า backend ไม่บังคับ
       };
 
-      const res = await fetch("https://undeclamatory-precollegiate-felicitas.ngrok-free.dev/api/profile", {
+      const res = await fetch("https://go2gether.vercel.app/api/profile", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

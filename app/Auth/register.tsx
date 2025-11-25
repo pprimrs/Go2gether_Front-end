@@ -3,14 +3,14 @@ import { Image } from 'expo-image';
 import { Link, router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { styles } from './styles/registerstyles';
 
@@ -68,7 +68,7 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      const resp = await fetch('https://undeclamatory-precollegiate-felicitas.ngrok-free.dev/api/auth/register', {
+      const resp = await fetch('https://go2gether.vercel.app/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,25 +1,25 @@
 // app/Mainapp/notipage.tsx
-import React, { useCallback, useMemo, useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  TextInput,
-  RefreshControl,
-  ActivityIndicator,
-  Platform,
-  StatusBar,
-  Alert,
-} from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, usePathname } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+    ActivityIndicator,
+    Alert,
+    Platform,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    Text,
+    TextInput,
+    View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { styles, COLORS } from "./styles/notistyles";
+import { COLORS, styles } from "./styles/notistyles";
 
 /* ---------- Config ---------- */
-const BASE_URL = "https://undeclamatory-precollegiate-felicitas.ngrok-free.dev";
+const BASE_URL = "https://go2gether.vercel.app";
 
 /* ---------- Types ---------- */
 type ApiNotification = {

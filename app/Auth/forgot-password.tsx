@@ -16,7 +16,7 @@ import { styles } from './styles/forgotstyles';
 
 // 🔹 ตัวอย่าง API (แก้ BASE_URL ให้ตรงกับ backend จริง)
 async function requestPasswordReset(email: string) {
-  const res = await fetch('https://undeclamatory-precollegiate-felicitas.ngrok-free.dev/api/auth/forgot-password', {
+  const res = await fetch('https://go2gether.vercel.app/api/auth/forgot-password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email }),

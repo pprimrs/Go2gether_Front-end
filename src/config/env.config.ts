@@ -45,7 +45,7 @@ const getEnvVars = (): EnvConfig => {
   
   // Development (default)
   return {
-    API_URL: process.env.EXPO_PUBLIC_API_URL || 'https://undeclamatory-precollegiate-felicitas.ngrok-free.dev',
+    API_URL: process.env.EXPO_PUBLIC_API_URL || 'https://go2gether.vercel.app',
     API_TIMEOUT: 30000,
     GOOGLE_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_DEV || '',
     APP_ENV: 'development',

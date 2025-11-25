@@ -7,7 +7,7 @@
 
 const axios = require('axios');
 
-const API_URL = process.env.API_URL || 'https://undeclamatory-precollegiate-felicitas.ngrok-free.dev';
+const API_URL = process.env.API_URL || 'https://go2gether.vercel.app';
 
 async function testApiConnectivity() {
   console.log('🧪 Testing API connectivity...');

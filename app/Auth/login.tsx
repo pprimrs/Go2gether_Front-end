@@ -18,7 +18,7 @@ import { styles } from './styles/loginstyles';
 
 // 👉 ถ้ารันบน Android Emulator ให้ใช้ 10.0.2.2
 // const BASE_URL = 'http://10.0.2.2:8080';
-const BASE_URL = 'https://undeclamatory-precollegiate-felicitas.ngrok-free.dev';
+const BASE_URL = 'https://go2gether.vercel.app';
 
 type Field = 'email' | 'password';
 

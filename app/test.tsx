@@ -53,7 +53,7 @@ export default function TestPage() {
 
       <View style={styles.info}>
         <Text style={styles.infoTitle}>API Configuration:</Text>
-        <Text style={styles.infoText}>• Base URL: https://undeclamatory-precollegiate-felicitas.ngrok-free.dev</Text>
+        <Text style={styles.infoText}>• Base URL: https://go2gether.vercel.app</Text>
         <Text style={styles.infoText}>• Timeout: 15000ms</Text>
         <Text style={styles.infoText}>• Auto token refresh: Enabled</Text>
         <Text style={styles.infoText}>• Secure storage: Enabled</Text>

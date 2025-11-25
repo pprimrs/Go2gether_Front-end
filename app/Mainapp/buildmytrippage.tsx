@@ -7,20 +7,20 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { styles } from "./styles/buildmytripstyles";
 
-const BASE_URL = "https://undeclamatory-precollegiate-felicitas.ngrok-free.dev"; // Android Emulator: http://10.0.2.2:8080
+const BASE_URL = "https://go2gether.vercel.app"; // Android Emulator: http://10.0.2.2:8080
 
 /* ---------- Per-user storage helpers ---------- */
 const USER_NS = (email: string) => `USER(${email})`;

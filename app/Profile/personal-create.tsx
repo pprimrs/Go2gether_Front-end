@@ -3,12 +3,12 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  Alert,
-  KeyboardAvoidingView, Platform,
-  Pressable,
-  ScrollView,
-  Text, TextInput,
-  View
+    Alert,
+    KeyboardAvoidingView, Platform,
+    Pressable,
+    ScrollView,
+    Text, TextInput,
+    View
 } from "react-native";
 import { styles } from "./styles/personalcreatestyles";
 
@@ -115,7 +115,7 @@ export default function PersonalCreateScreen() {
         username: await resolveUsername(form.name),
       };
 
-      const res = await fetch("https://undeclamatory-precollegiate-felicitas.ngrok-free.dev/api/profile", {
+      const res = await fetch("https://go2gether.vercel.app/api/profile", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

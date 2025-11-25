@@ -14,7 +14,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { styles } from './styles/verifystyles';
 
-const VERIFY_URL = 'https://undeclamatory-precollegiate-felicitas.ngrok-free.dev/api/auth/verify-otp';
+const VERIFY_URL = 'https://go2gether.vercel.app/api/auth/verify-otp';
 
 export default function VerifyCodeScreen() {
   const insets = useSafeAreaInsets();
